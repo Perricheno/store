@@ -86,3 +86,11 @@ export class CoreError extends Error {
     this.name = "CoreError";
   }
 }
+
+export interface CatalogPage {
+  products: Product[];
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+}

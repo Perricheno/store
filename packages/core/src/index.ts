@@ -26,9 +26,11 @@ import {
   type Settings,
   type Locale,
   type Job,
+  type CatalogPage,
 } from "./types";
 export * from "./types";
 export { getDrizzle };
+export { CATEGORIES } from "./categories";
 const runtime = globalThis as typeof globalThis & {
   __urbanmagCore?: { initialization?: Promise<void>; localKey: Buffer };
 };
@@ -223,16 +225,23 @@ async function lockVisitor(db: DB, id: string) {
     [id],
   );
 }
-async function productRows(
-  db: DB,
-  includeUnpublished = false,
-): Promise<Product[]> {
-  const rows = await db.query(
-    `SELECT * FROM products ${includeUnpublished ? "" : "WHERE published=true"} ORDER BY created_at DESC,id`,
-  );
+async function hydrateProducts(db: DB, rows: Row[]): Promise<Product[]> {
+  if (!rows.length) return [];
   const variants = await db.query(
-    "SELECT v.*,COALESCE(SUM(i.quantity-i.reserved),0)::integer AS available FROM variants v LEFT JOIN inventory i ON i.variant_id=v.id GROUP BY v.id,v.product_id,v.size,v.color ORDER BY v.id",
+    "SELECT v.*,COALESCE(SUM(i.quantity-i.reserved),0)::integer AS available FROM variants v LEFT JOIN inventory i ON i.variant_id=v.id WHERE v.product_id=ANY($1::text[]) GROUP BY v.id,v.product_id,v.size,v.color ORDER BY v.id",
+    [rows.map((row) => row.id)],
   );
+  const byProduct = new Map<string, Product["sizes"]>();
+  for (const variant of variants) {
+    const sizes = byProduct.get(variant.product_id) ?? [];
+    sizes.push({
+      id: variant.id,
+      size: variant.size,
+      color: variant.color,
+      available: variant.available,
+    });
+    byProduct.set(variant.product_id, sizes);
+  }
   return rows.map((r) => ({
     id: r.id,
     slug: r.slug,
@@ -244,19 +253,23 @@ async function productRows(
     price: r.price,
     ...(r.old_price != null ? { oldPrice: r.old_price } : {}),
     media: r.media,
-    sizes: variants
-      .filter((v) => v.product_id === r.id)
-      .map((v) => ({
-        id: v.id,
-        size: v.size,
-        color: v.color,
-        available: v.available,
-      })),
+    sizes: byProduct.get(r.id) ?? [],
     ...(r.kaspi_url ? { kaspiUrl: r.kaspi_url } : {}),
     isDemo: r.is_demo,
     published: r.published,
     createdAt: date(r.created_at),
   }));
+}
+async function productRows(
+  db: DB,
+  includeUnpublished = false,
+): Promise<Product[]> {
+  return hydrateProducts(
+    db,
+    await db.query(
+      `SELECT * FROM products ${includeUnpublished ? "" : "WHERE published=true"} ORDER BY created_at DESC,id`,
+    ),
+  );
 }
 export interface ProductFilters {
   includeUnpublished?: boolean;
@@ -270,52 +283,129 @@ export interface ProductFilters {
   sort?: string;
   gender?: string;
 }
+const filterSchema = z.object({
+  includeUnpublished: z.boolean().optional(),
+  q: z.string().trim().max(200).optional(),
+  category: z.string().max(80).optional(),
+  size: z.string().max(32).optional(),
+  minPrice: z.number().min(0).max(100000000).optional(),
+  maxPrice: z.number().min(0).max(100000000).optional(),
+  inStock: z.boolean().optional(),
+  available: z.boolean().optional(),
+  sort: z.string().max(32).optional(),
+  gender: z.enum(["men", "women", "unisex"]).optional(),
+});
+function catalogQuery(input: ProductFilters) {
+  const filters = parse(filterSchema, input),
+    params: unknown[] = [],
+    clauses: string[] = [];
+  const bind = (value: unknown) => {
+    params.push(value);
+    return `$${params.length}`;
+  };
+  if (!filters.includeUnpublished) clauses.push("p.published=true");
+  if (filters.q) {
+    const pattern = bind(`%${filters.q.replace(/[\\%_]/g, "\\$&")}%`);
+    clauses.push(
+      `(${["p.names->>'ru'", "p.names->>'kk'", "p.names->>'en'", "p.description->>'ru'", "p.description->>'kk'", "p.description->>'en'", "p.brand"].map((column) => `(${column}) ILIKE ${pattern}`).join(" OR ")})`,
+    );
+  }
+  if (filters.category) clauses.push(`p.category=${bind(filters.category)}`);
+  if (filters.gender)
+    clauses.push(`(p.gender=${bind(filters.gender)} OR p.gender='unisex')`);
+  if (filters.minPrice != null)
+    clauses.push(`p.price>=${bind(filters.minPrice)}`);
+  if (filters.maxPrice != null)
+    clauses.push(`p.price<=${bind(filters.maxPrice)}`);
+  if (filters.size || filters.inStock || filters.available) {
+    const size = filters.size ? ` AND v.size=${bind(filters.size)}` : "";
+    clauses.push(
+      `EXISTS(SELECT 1 FROM variants v JOIN inventory i ON i.variant_id=v.id WHERE v.product_id=p.id AND i.quantity>i.reserved${size})`,
+    );
+  }
+  const order =
+    filters.sort === "price-asc"
+      ? "p.price ASC,p.created_at DESC,p.id ASC"
+      : filters.sort === "price-desc"
+        ? "p.price DESC,p.created_at DESC,p.id ASC"
+        : "p.created_at DESC,p.id ASC";
+  return {
+    where: clauses.length ? `WHERE ${clauses.join(" AND ")}` : "",
+    params,
+    order,
+  };
+}
 export async function getProducts(
   filters: ProductFilters = {},
 ): Promise<Product[]> {
   await initCore();
-  let products = await productRows(
-    await database(),
-    filters.includeUnpublished,
+  const db = await database(),
+    query = catalogQuery(filters);
+  return hydrateProducts(
+    db,
+    await db.query(
+      `SELECT p.* FROM products p ${query.where} ORDER BY ${query.order}`,
+      query.params,
+    ),
   );
-  if (filters.q) {
-    const q = filters.q.toLocaleLowerCase();
-    products = products.filter((p) =>
-      [
-        ...Object.values(p.names),
-        p.brand,
-        ...Object.values(p.description),
-      ].some((v) => v.toLocaleLowerCase().includes(q)),
-    );
-  }
-  if (filters.category)
-    products = products.filter((p) => p.category === filters.category);
-  if (filters.gender)
-    products = products.filter(
-      (p) => p.gender === filters.gender || p.gender === "unisex",
-    );
-  if (filters.size)
-    products = products.filter((p) =>
-      p.sizes.some((s) => s.size === filters.size && s.available > 0),
-    );
-  if (filters.minPrice != null)
-    products = products.filter((p) => p.price >= filters.minPrice!);
-  if (filters.maxPrice != null)
-    products = products.filter((p) => p.price <= filters.maxPrice!);
-  if (filters.inStock || filters.available)
-    products = products.filter((p) => p.sizes.some((s) => s.available > 0));
-  if (filters.sort === "price-asc") products.sort((a, b) => a.price - b.price);
-  if (filters.sort === "price-desc") products.sort((a, b) => b.price - a.price);
-  return products;
 }
-export async function getProduct(slug: string) {
-  return (await getProducts()).find((p) => p.slug === slug) ?? null;
+export async function getCatalogPage(
+  filters: ProductFilters & { page?: number; pageSize?: number } = {},
+): Promise<CatalogPage> {
+  await initCore();
+  const { page, pageSize } = parse(
+      z.object({
+        page: z.number().int().min(1).max(1000000).default(1),
+        pageSize: z.number().int().min(1).max(60).default(24),
+      }),
+      filters,
+    ),
+    query = catalogQuery(filters),
+    db = await database();
+  const [count] = await db.query(
+    `SELECT COUNT(*)::integer AS total FROM products p ${query.where}`,
+    query.params,
+  );
+  const rows = await db.query(
+    `SELECT p.* FROM products p ${query.where} ORDER BY ${query.order} LIMIT $${query.params.length + 1} OFFSET $${query.params.length + 2}`,
+    [...query.params, pageSize, (page - 1) * pageSize],
+  );
+  return {
+    products: await hydrateProducts(db, rows),
+    total: count!.total,
+    page,
+    pageSize,
+    hasMore: page * pageSize < count!.total,
+  };
+}
+export async function getProduct(slug: string): Promise<Product | null> {
+  await initCore();
+  const db = await database();
+  return (
+    (
+      await hydrateProducts(
+        db,
+        await db.query(
+          "SELECT * FROM products WHERE slug=$1 AND published=true",
+          [slug],
+        ),
+      )
+    )[0] ?? null
+  );
 }
 async function cart(db: DB, visitorId: string): Promise<Cart> {
-  const products = await productRows(db);
   const rows = await db.query(
     "SELECT c.*,v.product_id,v.size,v.color FROM carts c JOIN variants v ON v.id=c.variant_id WHERE c.visitor_id=$1 ORDER BY c.variant_id",
     [visitorId],
+  );
+  const products = await hydrateProducts(
+    db,
+    rows.length
+      ? await db.query(
+          "SELECT * FROM products WHERE published=true AND id=ANY($1::text[])",
+          [rows.map((row) => row.product_id)],
+        )
+      : [],
   );
   const items = rows.flatMap((r) => {
     const product = products.find((p) => p.id === r.product_id);

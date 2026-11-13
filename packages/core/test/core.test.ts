@@ -58,15 +58,122 @@ test("bootstrap owner is forced to rotate password; realms cannot cross", async 
 });
 test("translated demo catalog has integer prices, no photos or unverified marketplace links", async () => {
   const products = await core.getProducts();
-  assert.equal(products.length, 12);
+  assert.equal(products.length, 500);
   for (const p of products) {
     assert.equal(p.isDemo, true);
     assert.ok(p.names.ru && p.names.kk && p.names.en);
     assert.ok(Number.isInteger(p.price));
     assert.deepEqual(p.media, []);
     assert.equal(p.kaspiUrl, undefined);
+    assert.equal(p.brand, "DEMO");
+    assert.equal(p.oldPrice, undefined);
   }
-  assert.equal((await core.getProducts({ category: "sneakers" })).length, 1);
+  assert.equal(new Set(products.map((product) => product.id)).size, 500);
+  assert.equal(new Set(products.map((product) => product.slug)).size, 500);
+  for (const locale of ["ru", "kk", "en"] as const)
+    assert.equal(
+      new Set(products.map((product) => product.names[locale])).size,
+      500,
+    );
+  assert.deepEqual(
+    new Set(products.map((product) => product.category)),
+    new Set(core.CATEGORIES.map((category) => category.id)),
+  );
+  for (const category of core.CATEGORIES) {
+    assert.ok(category.names.ru && category.names.kk && category.names.en);
+    assert.ok(
+      products.filter((product) => product.category === category.id).length >=
+        28,
+    );
+  }
+  for (const slug of [
+    "city-tee",
+    "essential-tee",
+    "studio-shirt",
+    "linen-shirt",
+    "heavy-hoodie",
+    "weekend-hoodie",
+    "shell-jacket",
+    "field-jacket",
+    "wide-trousers",
+    "daily-chino",
+    "canvas-tote",
+    "court-sneakers",
+  ])
+    assert.ok(products.some((product) => product.slug === slug));
+  assert.equal((await core.getProducts({ category: "sneakers" })).length, 30);
+});
+test("SQL catalog pagination is stable, bounded and applies stock, language, size and price filters before slicing", async () => {
+  const all = await core.getProducts(),
+    first = await core.getCatalogPage(),
+    second = await core.getCatalogPage({ page: 2 });
+  assert.equal(first.total, 500);
+  assert.equal(first.page, 1);
+  assert.equal(first.pageSize, 24);
+  assert.equal(first.hasMore, true);
+  assert.equal(first.products.length, 24);
+  assert.deepEqual(
+    (await core.getCatalogPage()).products.map((product) => product.id),
+    first.products.map((product) => product.id),
+  );
+  assert.equal(
+    new Set(
+      [...first.products, ...second.products].map((product) => product.id),
+    ).size,
+    48,
+  );
+  const last = await core.getCatalogPage({ page: 21 });
+  assert.equal(last.products.length, 20);
+  assert.equal(last.hasMore, false);
+  assert.deepEqual((await core.getCatalogPage({ page: 22 })).products, []);
+  const filters = {
+    category: "basketball-shoes",
+    q: "БАСКЕТБОЛ",
+    gender: "men",
+    size: "42",
+    minPrice: 44000,
+    maxPrice: 50000,
+    inStock: true,
+    sort: "price-asc",
+  };
+  const expected = all
+    .filter(
+      (product) =>
+        product.category === filters.category &&
+        (product.gender === "men" || product.gender === "unisex") &&
+        product.names.ru.toLocaleLowerCase().includes("баскетбол") &&
+        product.price >= filters.minPrice &&
+        product.price <= filters.maxPrice &&
+        product.sizes.some((size) => size.size === "42" && size.available > 0),
+    )
+    .sort(
+      (a, b) =>
+        a.price - b.price ||
+        b.createdAt.localeCompare(a.createdAt) ||
+        (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+    );
+  const collected: string[] = [];
+  for (let page = 1; page <= 10; page++) {
+    const result = await core.getCatalogPage({ ...filters, page, pageSize: 7 });
+    assert.equal(result.total, expected.length);
+    collected.push(...result.products.map((product) => product.id));
+    if (!result.hasMore) break;
+  }
+  assert.ok(expected.length > 0);
+  assert.deepEqual(
+    collected,
+    expected.map((product) => product.id),
+  );
+  for (const q of ["%", "_", "' OR true --"]) {
+    assert.equal((await core.getCatalogPage({ q })).total, 0);
+  }
+  assert.equal((await core.getCatalogPage({ q: "Арқасөмке" })).total, 29);
+  await assert.rejects(core.getCatalogPage({ page: 0 }), {
+    code: "VALIDATION",
+  });
+  await assert.rejects(core.getCatalogPage({ pageSize: 61 }), {
+    code: "VALIDATION",
+  });
 });
 test("cart updates set quantities; favorites are visitor isolated", async () => {
   const product = (await core.getProducts())[0]!;
@@ -938,4 +1045,108 @@ test("reconciliation migration upgrades legacy payments and is safe to repeat", 
     2,
   );
   assert.ok((await core.listPendingInvoices()).length > 0);
+});
+
+test("versioned 500-item seed upgrades the original catalog without changing user products or stock and is repeatable", async () => {
+  const { seed } = await import("../src/seed"),
+    { migration } = await import("../src/migration");
+  await transaction(async (db) => {
+    await db.exec(
+      "CREATE SCHEMA core_seed_upgrade_test; SET LOCAL search_path TO core_seed_upgrade_test",
+    );
+    await db.exec(migration);
+    await db.query(
+      "INSERT INTO products SELECT * FROM public.products WHERE id LIKE 'demo-%' AND id NOT LIKE 'demo-z-%'",
+    );
+    await db.query(
+      "INSERT INTO variants SELECT v.* FROM public.variants v JOIN products p ON p.id=v.product_id",
+    );
+    await db.query(
+      "INSERT INTO inventory SELECT i.* FROM public.inventory i JOIN variants v ON v.id=i.variant_id",
+    );
+    await db.query(
+      "UPDATE products SET brand='URBANMAG',old_price=CASE WHEN slug='heavy-hoodie' THEN 38900 ELSE NULL END",
+    );
+    await db.query(
+      "INSERT INTO products(id,slug,category,gender,brand,names,description,price,media,is_demo,published) VALUES('user-kept','user-kept','accessories','unisex','User supplied',$1::jsonb,$2::jsonb,12345,'[]',false,false)",
+      [
+        JSON.stringify({ ru: "Свой товар", kk: "Өз тауары", en: "User item" }),
+        JSON.stringify({ ru: "", kk: "", en: "" }),
+      ],
+    );
+    const beforeStock = await db.query(
+        "SELECT * FROM inventory ORDER BY variant_id,branch_id",
+      ),
+      [userBefore] = await db.query(
+        "SELECT * FROM products WHERE id='user-kept'",
+      );
+    await seed(db);
+    assert.equal(
+      (
+        await db.query(
+          "SELECT count(*)::integer AS count FROM products WHERE is_demo=true",
+        )
+      )[0]!.count,
+      500,
+    );
+    assert.deepEqual(
+      (await db.query("SELECT * FROM products WHERE id='user-kept'"))[0],
+      userBefore,
+    );
+    assert.deepEqual(
+      await db.query(
+        "SELECT * FROM inventory WHERE variant_id NOT LIKE 'demo-z-%' ORDER BY variant_id,branch_id",
+      ),
+      beforeStock,
+    );
+    assert.equal(
+      (
+        await db.query(
+          "SELECT old_price,brand FROM products WHERE slug='heavy-hoodie'",
+        )
+      )[0]!.old_price,
+      null,
+    );
+    const [expanded] = await db.query(
+      "SELECT id FROM products WHERE id LIKE 'demo-z-%' ORDER BY id LIMIT 1",
+    );
+    await db.query(
+      "UPDATE products SET price=55555,published=false WHERE id=$1",
+      [expanded!.id],
+    );
+    await db.query(
+      "UPDATE inventory SET quantity=9,reserved=2 WHERE variant_id IN (SELECT id FROM variants WHERE product_id=$1)",
+      [expanded!.id],
+    );
+    const alteredStock = await db.query(
+      "SELECT * FROM inventory ORDER BY variant_id,branch_id",
+    );
+    await seed(db);
+    assert.equal(
+      (await db.query("SELECT count(*)::integer AS count FROM products"))[0]!
+        .count,
+      501,
+    );
+    assert.equal(
+      (
+        await db.query("SELECT price,published FROM products WHERE id=$1", [
+          expanded!.id,
+        ])
+      )[0]!.price,
+      55555,
+    );
+    assert.deepEqual(
+      await db.query("SELECT * FROM inventory ORDER BY variant_id,branch_id"),
+      alteredStock,
+    );
+    assert.equal(
+      (
+        await db.query(
+          "SELECT count(*)::integer AS count FROM seed_migrations WHERE version='demo-catalog-500-v1'",
+        )
+      )[0]!.count,
+      1,
+    );
+    await db.exec("DROP SCHEMA core_seed_upgrade_test CASCADE");
+  });
 });
