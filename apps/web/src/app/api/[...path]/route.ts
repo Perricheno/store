@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { createHmac, timingSafeEqual, createHash } from 'node:crypto';
 import * as core from '@urbanmag/core';
 import { assertOrigin, body, cookieName, cookieOptions, currentUser, rateLimit, realm, requireStaff, sessionToken, visitorId } from '@/lib/http';
-import { isLocale } from '@/lib/config';
+import { checkoutEnabled, isLocale, indexingEnabled } from '@/lib/config';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import sharp from 'sharp';
@@ -27,7 +27,7 @@ async function handler(request: NextRequest, context: { params: Promise<{path: s
       const q = request.nextUrl.searchParams;
       return json(await core.getProducts({ q:q.get('q') || undefined, category:q.get('category') || undefined, gender:q.get('gender') || undefined, size:q.get('size') || undefined, minPrice:q.has('minPrice') ? Number(q.get('minPrice')) : undefined, maxPrice:q.has('maxPrice') ? Number(q.get('maxPrice')) : undefined, inStock:q.get('available') === 'true' || q.get('inStock') === 'true', sort:q.get('sort') || undefined }));
     }
-    if (path === 'settings' && method === 'GET') return json(await core.getSettings());
+    if (path === 'settings' && method === 'GET') return json({...await core.getSettings(),checkoutEnabled:checkoutEnabled()});
     if (path === 'cart') {
       const visitor = await visitorId();
       if (method === 'GET') return json(await core.getCart(visitor));
@@ -41,6 +41,7 @@ async function handler(request: NextRequest, context: { params: Promise<{path: s
       const products = await core.getFavorites(visitor); return json({products,productIds:products.map(p=>p.id)});
     }
     if (path === 'checkout' && method === 'POST') {
+      if(!checkoutEnabled())throw new core.CoreError(503,'checkout_unavailable','Оплата пока недоступна.');
       rateLimit(request,'checkout',10); const input = await body(request); const user = await currentUser();
       const result = await core.createCheckout(await visitorId(),{...input,locale:isLocale(input.locale)?input.locale:'ru'},user && !user.mustChangePassword ? user.id : undefined);
       await drainTestJobs();
@@ -81,7 +82,7 @@ async function handler(request: NextRequest, context: { params: Promise<{path: s
         const bytes=await sharp(Buffer.from(await file.arrayBuffer()),{limitInputPixels:40_000_000}).rotate().resize(1800,1800,{fit:'inside',withoutEnlargement:true}).webp({quality:85}).toBuffer();
         const name=`${createHash('sha256').update(bytes).digest('hex')}.webp`;const dir=process.env.UPLOADS_DIR||'.data/uploads';await mkdir(dir,{recursive:true});await writeFile(join(dir,name),bytes);return json({url:`/api/media/${name}`});
       }
-      if(path==='staff/status')return json({paymentMode:process.env.APIPAY_MODE||'mock',apiPayConfigured:!!process.env.APIPAY_API_KEY,smtpConfigured:!!process.env.SMTP_URL,database:process.env.DATABASE_URL?'PostgreSQL':'Embedded PostgreSQL',indexing:false});
+      if(path==='staff/status')return json({paymentMode:process.env.APIPAY_MODE||'mock',apiPayConfigured:!!process.env.APIPAY_API_KEY,smtpConfigured:!!process.env.SMTP_URL,database:process.env.DATABASE_URL?'PostgreSQL':'Embedded PostgreSQL',indexing:indexingEnabled()});
       if(path==='staff/jobs'){await requireStaff(true);return json(await core.listJobs(user.id));}
       if(path==='staff/audit'){await requireStaff(true);return json(await core.listAudit(user.id));}
       if (path === 'staff/products') { if (method === 'GET') return json(await core.getProducts({includeUnpublished:true})); return json(await core.upsertProduct(user.id,await body(request))); }

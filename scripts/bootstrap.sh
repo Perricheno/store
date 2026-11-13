@@ -11,7 +11,8 @@ mkdir -p "$secret_dir"
 chmod 700 "$secret_dir"
 random() { openssl rand -hex 32; }
 make_env() {
-  local file="$1" app="$2" staff="$3" mode="$4"
+  local file="$1" app="$2" staff="$3" mode="$4" smtp='' sender=''
+  if [[ "$mode" == mock ]]; then smtp='smtp://mailpit:1025'; sender='Urbanmag <noreply@urbanmag.test>'; fi
   cat > "$file" <<ENV
 POSTGRES_PASSWORD=$(random)
 APP_URL=$app
@@ -23,8 +24,9 @@ MAIL_ENCRYPTION_KEY=$(random)
 APIPAY_MODE=$mode
 APIPAY_API_KEY=
 APIPAY_WEBHOOK_SECRET=
-SMTP_URL=smtp://mailpit:1025
-MAIL_FROM=Urbanmag <noreply@example.com>
+SMTP_URL=$smtp
+MAIL_FROM=$sender
+SEO_INDEXING_ENABLED=false
 UPLOADS_DIR=/data/uploads
 IMAGE_TAG=urbanmag:initial
 ENV

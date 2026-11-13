@@ -18,4 +18,7 @@ CREATE INDEX IF NOT EXISTS jobs_pending_idx ON jobs(status,available_at);
 CREATE TABLE IF NOT EXISTS audit (id text PRIMARY KEY,actor_id text,action text NOT NULL,entity_id text,details jsonb NOT NULL DEFAULT '{}',created_at timestamptz NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS settings (id text PRIMARY KEY,value jsonb NOT NULL);
 INSERT INTO schema_migrations(version) VALUES (1) ON CONFLICT DO NOTHING;
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS last_checked_at timestamptz;
+CREATE INDEX IF NOT EXISTS payments_reconciliation_idx ON payments(last_checked_at,created_at,id) WHERE invoice_id IS NOT NULL AND status<>'refunded';
+INSERT INTO schema_migrations(version) VALUES (2) ON CONFLICT DO NOTHING;
 `;

@@ -591,3 +591,351 @@ test("database adapters preserve JSON, timestamps and SQL arrays in pooled and t
     ),
   );
 });
+
+test("paid notifications preserve an outstanding refund until a verified full refund", async () => {
+  const product = (await core.getProduct("city-tee"))!,
+    variant = product.sizes[0]!.id,
+    v = visitor(22);
+  await core.updateCart(v, variant, 1);
+  const { order } = await core.createCheckout(
+    v,
+    checkout(
+      "refund_obligation_123",
+      product.price,
+      "refund-obligation@example.test",
+    ),
+  );
+  const paid = {
+    eventId: "refund-obligation-paid",
+    orderId: order.id,
+    invoiceId: "refund-obligation-invoice",
+    amount: order.total,
+    environment: "mock",
+    status: "paid" as const,
+  };
+  await core.processPaymentEvent(paid);
+  assert.equal(
+    (await core.advanceOrder(actorId, order.id, "cancelled")).status,
+    "refund_required",
+  );
+  const before = await (
+    await database()
+  ).query(
+    "SELECT quantity,reserved FROM inventory WHERE variant_id=$1 ORDER BY branch_id",
+    [variant],
+  );
+  assert.deepEqual(await core.processPaymentEvent(paid), {
+    status: "refund_required",
+    duplicate: true,
+  });
+  assert.deepEqual(
+    await core.processPaymentEvent({
+      ...paid,
+      eventId: "refund-obligation-reconciled-paid",
+    }),
+    { status: "refund_required", duplicate: false },
+  );
+  assert.equal(
+    (
+      await core.processPaymentEvent({
+        ...paid,
+        eventId: "refund-obligation-partial",
+        status: "partially_refunded",
+      })
+    ).status,
+    "refund_required",
+  );
+  assert.equal(
+    (
+      await core.processPaymentEvent({
+        ...paid,
+        eventId: "refund-obligation-paid-after-partial",
+      })
+    ).status,
+    "refund_required",
+  );
+  assert.equal(
+    (await core.getOrder(order.id, { visitorId: v }))!.status,
+    "refund_required",
+  );
+  assert.deepEqual(
+    await (
+      await database()
+    ).query(
+      "SELECT quantity,reserved FROM inventory WHERE variant_id=$1 ORDER BY branch_id",
+      [variant],
+    ),
+    before,
+  );
+  assert.equal(
+    (
+      await core.processPaymentEvent({
+        ...paid,
+        eventId: "refund-obligation-fully-refunded",
+        status: "refunded",
+      })
+    ).status,
+    "refunded",
+  );
+  assert.deepEqual(
+    await (
+      await database()
+    ).query(
+      "SELECT quantity,reserved FROM inventory WHERE variant_id=$1 ORDER BY branch_id",
+      [variant],
+    ),
+    before,
+  );
+});
+
+test("product descriptions may be empty or omitted while all translated names remain mandatory", async () => {
+  const input = {
+    slug: "description-optional",
+    category: "accessories",
+    gender: "unisex",
+    brand: "Test",
+    names: { ru: "Название", kk: "Атауы", en: "Name" },
+    price: 10000,
+    media: [],
+    isDemo: false,
+    published: false,
+    sizes: [{ size: "ONE SIZE", color: "Black" }],
+  };
+  const created = await core.upsertProduct(actorId, input);
+  assert.deepEqual(created.description, { ru: "", kk: "", en: "" });
+  const updated = await core.upsertProduct(actorId, {
+    ...input,
+    id: created.id,
+    description: { ru: "", kk: "   ", en: "" },
+    sizes: created.sizes,
+  });
+  assert.deepEqual(updated.description, { ru: "", kk: "", en: "" });
+  await assert.rejects(
+    core.upsertProduct(actorId, {
+      ...input,
+      slug: "name-still-required",
+      description: { ru: "", kk: "", en: "" },
+      names: { ru: "", kk: "Атауы", en: "Name" },
+    }),
+    { code: "VALIDATION" },
+  );
+  await assert.rejects(
+    core.upsertProduct(actorId, {
+      ...input,
+      slug: "translation-still-required",
+      names: { ru: "Название", en: "Name" },
+    }),
+    { code: "VALIDATION" },
+  );
+});
+
+test("a full refund before paid releases its reservation and delayed paid cannot consume it", async () => {
+  const product = (await core.getProduct("essential-tee"))!,
+    variant = product.sizes[1]!.id,
+    v = visitor(23),
+    db = await database();
+  const before = await db.query(
+    "SELECT quantity,reserved FROM inventory WHERE variant_id=$1 ORDER BY branch_id",
+    [variant],
+  );
+  await core.updateCart(v, variant, 1);
+  const { order } = await core.createCheckout(
+    v,
+    checkout(
+      "refund_before_paid_123",
+      product.price,
+      "refund-before-paid@example.test",
+    ),
+  );
+  const event = {
+    eventId: "full-refund-first",
+    orderId: order.id,
+    invoiceId: "full-refund-before-paid-invoice",
+    amount: order.total,
+    environment: "mock",
+    status: "refunded" as const,
+  };
+  await core.processPaymentEvent(event);
+  assert.deepEqual(
+    await db.query(
+      "SELECT quantity,reserved FROM inventory WHERE variant_id=$1 ORDER BY branch_id",
+      [variant],
+    ),
+    before,
+  );
+  assert.equal(
+    (
+      await db.query("SELECT state FROM reservations WHERE order_id=$1", [
+        order.id,
+      ])
+    )[0]!.state,
+    "released",
+  );
+  await core.processPaymentEvent({
+    ...event,
+    eventId: "delayed-paid-after-full-refund",
+    status: "paid",
+  });
+  assert.equal(
+    (
+      await db.query("SELECT status FROM payments WHERE order_id=$1", [
+        order.id,
+      ])
+    )[0]!.status,
+    "refunded",
+  );
+  assert.deepEqual(
+    await db.query(
+      "SELECT quantity,reserved FROM inventory WHERE variant_id=$1 ORDER BY branch_id",
+      [variant],
+    ),
+    before,
+  );
+});
+
+test("delayed partial refunds cannot regress a completed full refund", async () => {
+  const product = (await core.getProduct("studio-shirt"))!,
+    variant = product.sizes[2]!.id,
+    v = visitor(24),
+    db = await database();
+  await core.updateCart(v, variant, 1);
+  const { order } = await core.createCheckout(
+    v,
+    checkout(
+      "refund_monotonic_123",
+      product.price,
+      "monotonic-refund@example.test",
+    ),
+  );
+  const event = {
+    eventId: "monotonic-paid",
+    orderId: order.id,
+    invoiceId: "monotonic-invoice",
+    amount: order.total,
+    environment: "mock",
+    status: "paid" as const,
+  };
+  await core.processPaymentEvent(event);
+  const consumed = await db.query(
+    "SELECT quantity,reserved FROM inventory WHERE variant_id=$1 ORDER BY branch_id",
+    [variant],
+  );
+  assert.equal(
+    (
+      await core.processPaymentEvent({
+        ...event,
+        eventId: "monotonic-full-refund",
+        status: "refunded",
+      })
+    ).status,
+    "refunded",
+  );
+  assert.equal(
+    (
+      await core.processPaymentEvent({
+        ...event,
+        eventId: "monotonic-delayed-partial",
+        status: "partially_refunded",
+      })
+    ).status,
+    "refunded",
+  );
+  assert.equal(
+    (
+      await db.query("SELECT status FROM payments WHERE order_id=$1", [
+        order.id,
+      ])
+    )[0]!.status,
+    "refunded",
+  );
+  assert.deepEqual(
+    await db.query(
+      "SELECT quantity,reserved FROM inventory WHERE variant_id=$1 ORDER BY branch_id",
+      [variant],
+    ),
+    consumed,
+  );
+});
+
+test("staff reset email points to the staff host and routed staff reset path", async () => {
+  const prior = process.env.STAFF_URL;
+  process.env.STAFF_URL = "https://staff.example.test/";
+  try {
+    await core.requestPasswordReset("owner@example.test", "staff");
+  } finally {
+    if (prior) process.env.STAFF_URL = prior;
+    else delete process.env.STAFF_URL;
+  }
+  const rows = await (
+    await database()
+  ).query(
+    "SELECT payload FROM jobs WHERE type='send_mail' AND payload ? 'encrypted'",
+  );
+  const mail = rows
+    .map((row) => core.decryptMailPayload(row.payload))
+    .find((mail) => mail.to === "owner@example.test")!;
+  const url = new URL(mail.text.match(/http[^\s]+/)![0]);
+  assert.equal(url.origin, "https://staff.example.test");
+  assert.equal(url.pathname, "/staff/reset-password");
+  assert.ok(url.searchParams.get("token"));
+});
+
+test("reconciliation prioritizes an old pending invoice and fairly rotates more than 500 historical invoices", async () => {
+  const db = await database();
+  await db.query(`INSERT INTO orders(id,visitor_id,email,phone,fulfillment,locale,status,total,lines,idempotency_key,request_hash,access_token_hash,expires_at,created_at)
+ SELECT 'rotation-order-'||n,'rotation-visitor-xxxxxxxx','rotation@example.test','+7 701 123 45 67','pickup','ru',CASE WHEN n=0 THEN 'awaiting_payment' ELSE 'paid' END,10000,'[]'::jsonb,'rotation-key-'||n,'fixture','fixture',now()+interval '1 day',now()-interval '1 day'+n*interval '1 second' FROM generate_series(0,501) n`);
+  await db.query(`INSERT INTO payments(id,order_id,invoice_id,amount,environment,status,created_at)
+ SELECT 'rotation-payment-'||n,'rotation-order-'||n,'rotation-invoice-'||n,10000,'mock',CASE WHEN n=0 THEN 'pending' ELSE 'paid' END,now()-interval '1 day'+n*interval '1 second' FROM generate_series(0,501) n`);
+  const first = await core.listPendingInvoices();
+  assert.equal(first.length, 50);
+  assert.ok(first.some((invoice) => invoice.orderId === "rotation-order-0"));
+  const seen = new Set(
+    first
+      .filter((invoice) => invoice.orderId.startsWith("rotation-order-"))
+      .map((invoice) => invoice.orderId),
+  );
+  for (let i = 0; i < 29 && seen.size < 502; i++) {
+    const batch = await core.listPendingInvoices();
+    assert.ok(batch.length <= 50);
+    for (const invoice of batch)
+      if (invoice.orderId.startsWith("rotation-order-"))
+        seen.add(invoice.orderId);
+  }
+  assert.equal(seen.size, 502);
+  assert.equal(
+    (
+      await db.query(
+        "SELECT count(*)::integer AS count FROM payments WHERE id LIKE 'rotation-payment-%' AND last_checked_at IS NOT NULL",
+      )
+    )[0]!.count,
+    502,
+  );
+});
+
+test("reconciliation migration upgrades legacy payments and is safe to repeat", async () => {
+  const db = await database(),
+    { migration } = await import("../src/migration");
+  const [before] = await db.query(
+    "SELECT count(*)::integer AS count FROM payments",
+  );
+  await db.exec("ALTER TABLE payments DROP COLUMN last_checked_at CASCADE");
+  await db.query("DELETE FROM schema_migrations WHERE version=2");
+  await db.exec(migration);
+  await db.exec(migration);
+  const [after] = await db.query(
+    "SELECT count(*)::integer AS count FROM payments",
+  );
+  assert.equal(after!.count, before!.count);
+  assert.equal(
+    (await db.query("SELECT last_checked_at FROM payments LIMIT 1"))[0]!
+      .last_checked_at,
+    null,
+  );
+  assert.equal(
+    (
+      await db.query("SELECT version FROM schema_migrations WHERE version=2")
+    )[0]!.version,
+    2,
+  );
+  assert.ok((await core.listPendingInvoices()).length > 0);
+});

@@ -90,6 +90,7 @@ export const payments = pgTable("payments", {
   environment: text("environment").notNull(),
   status: text("status").notNull(),
   paymentUrl: text("payment_url"),
+  lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
 });
 export const jobs = pgTable("jobs", {
   id: text("id").primaryKey(),

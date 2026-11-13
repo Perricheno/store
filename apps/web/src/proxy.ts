@@ -22,4 +22,4 @@ export function proxy(request: NextRequest) {
   if (pathname.startsWith('/api/') || privatePage) response.headers.set('Cache-Control', 'private, no-store');
   return response;
 }
-export const config = { matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'] };
+export const config = { matcher: ['/((?!_next/static|_next/image|favicon.ico|api/health).*)'] };

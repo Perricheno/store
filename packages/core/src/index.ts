@@ -63,6 +63,13 @@ const translations = z.object({
   kk: z.string().trim().min(1).max(4000),
   en: z.string().trim().min(1).max(4000),
 });
+const descriptionTranslations = z
+  .object({
+    ru: z.string().trim().max(4000).default(""),
+    kk: z.string().trim().max(4000).default(""),
+    en: z.string().trim().max(4000).default(""),
+  })
+  .default({ ru: "", kk: "", en: "" });
 function user(row: Row): User {
   return {
     id: row.id,
@@ -539,7 +546,11 @@ export async function requestPasswordReset(
       "INSERT INTO password_tokens(token_hash,user_id,kind,realm,expires_at) VALUES($1,$2,'reset',$3,$4)",
       [sha(value), row.id, realm, new Date(Date.now() + 3600000)],
     );
-    const url = `${(realm === "staff" ? process.env.STAFF_URL : process.env.APP_URL) || "http://localhost:3000"}/reset-password?token=${encodeURIComponent(value)}`;
+    const base = (
+      (realm === "staff" ? process.env.STAFF_URL : process.env.APP_URL) ||
+      "http://localhost:3000"
+    ).replace(/\/+$/, "");
+    const url = `${base}/${realm === "staff" ? "staff/" : ""}reset-password?token=${encodeURIComponent(value)}`;
     await enqueue(
       db,
       "send_mail",
@@ -929,7 +940,7 @@ const productInput = z.object({
   gender: z.enum(["men", "women", "unisex"]),
   brand: z.string().trim().min(1).max(100),
   names: translations,
-  description: translations,
+  description: descriptionTranslations,
   price: z.number().int().min(1).max(100000000),
   oldPrice: z.number().int().min(0).max(100000000).optional(),
   media: z
@@ -1418,7 +1429,13 @@ export async function processPaymentEvent(
       if (["refunded", "partially_refunded"].includes(payment.status))
         next = order.status;
       else if (
-        ["paid", "processing", "ready", "completed"].includes(order.status)
+        [
+          "paid",
+          "processing",
+          "ready",
+          "completed",
+          "refund_required",
+        ].includes(order.status)
       )
         next = order.status;
       else if (
@@ -1437,6 +1454,9 @@ export async function processPaymentEvent(
         ]);
     } else if (value.status === "refunded") {
       // Refunds do not restore stock: a manager must inspect physical returns.
+      // A full refund may arrive before its paid event; release only stock that
+      // remains reserved, never goods already consumed by a paid order.
+      await releaseStock(db, order.id);
       if (!["paid", "partially_refunded", "refunded"].includes(payment.status))
         next = "manual_review";
       else next = "refunded";
@@ -1446,14 +1466,22 @@ export async function processPaymentEvent(
       );
     } else if (value.status === "partially_refunded") {
       // Partial refunds need explicit human review; inventory and fulfillment stay untouched.
-      next = "manual_review";
-      await db.query(
-        "UPDATE payments SET status='partially_refunded' WHERE order_id=$1",
-        [order.id],
-      );
+      // A delayed partial notification cannot undo a verified full refund.
+      if (payment.status !== "refunded") {
+        next =
+          order.status === "refund_required"
+            ? "refund_required"
+            : "manual_review";
+        await db.query(
+          "UPDATE payments SET status='partially_refunded' WHERE order_id=$1",
+          [order.id],
+        );
+      }
     } else if (value.status === "pending" || value.status === "error") {
       // Nonterminal notifications never release a stock reservation.
-    } else if (payment.status !== "paid" && payment.status !== "refunded") {
+    } else if (
+      !["paid", "partially_refunded", "refunded"].includes(payment.status)
+    ) {
       if (order.status === "awaiting_payment") {
         await releaseStock(db, order.id);
         next = value.status;
@@ -1481,18 +1509,49 @@ export async function listPendingInvoices(): Promise<
   }>
 > {
   await initCore();
-  return (
-    await (
-      await database()
-    ).query(
-      "SELECT order_id,invoice_id,amount,environment FROM payments WHERE invoice_id IS NOT NULL AND status<>'refunded' ORDER BY created_at DESC LIMIT 500",
-    )
-  ).map((r) => ({
-    orderId: r.order_id,
-    invoiceId: r.invoice_id,
-    amount: r.amount,
-    environment: r.environment,
-  }));
+  return transaction(async (db) => {
+    const active =
+      "(p.status IN ('pending','error','partially_refunded') OR o.status IN ('awaiting_payment','refund_required','manual_review'))";
+    const select = (
+      condition: string,
+      limit: number,
+      excluded: string[] = [],
+    ) =>
+      db.query(
+        `SELECT p.id,p.order_id,p.invoice_id,p.amount,p.environment
+       FROM payments p JOIN orders o ON o.id=p.order_id
+       WHERE p.invoice_id IS NOT NULL AND p.status<>'refunded'
+         AND (${condition}) AND NOT(p.id=ANY($2::text[]))
+       ORDER BY p.last_checked_at ASC NULLS FIRST,p.created_at ASC,p.id ASC
+       LIMIT $1 FOR UPDATE OF p SKIP LOCKED`,
+        [limit, excluded],
+      );
+    // Keep capacity for both urgent orders and historical invoices. Each queue
+    // rotates by a persisted timestamp, so neither can be crowded out forever.
+    const rows = [
+      ...(await select(active, 30)),
+      ...(await select(`NOT ${active}`, 20)),
+    ];
+    if (rows.length < 50)
+      rows.push(
+        ...(await select(
+          "true",
+          50 - rows.length,
+          rows.map((row) => row.id),
+        )),
+      );
+    if (rows.length)
+      await db.query(
+        "UPDATE payments SET last_checked_at=now() WHERE id=ANY($1::text[])",
+        [rows.map((row) => row.id)],
+      );
+    return rows.map((r) => ({
+      orderId: r.order_id,
+      invoiceId: r.invoice_id,
+      amount: r.amount,
+      environment: r.environment,
+    }));
+  });
 }
 /** Live reservations are released only by a verified provider cancellation/expiration event.
  * A wall-clock deadline is never proof that the provider did not accept money. */
