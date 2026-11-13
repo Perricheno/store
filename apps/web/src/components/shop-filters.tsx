@@ -29,6 +29,8 @@ const copy = {
     shoes: "Обувь",
     oneSize: "Единый размер",
     selected: "Выбранные фильтры",
+    priceAsc: "Цена ↑",
+    priceDesc: "Цена ↓",
     remove: (name: string) => `Убрать: ${name}`,
     invalidPrice: "Цена «От» должна быть не больше цены «До».",
     invalidNumber: "Укажите цену от 0 ₸.",
@@ -40,6 +42,8 @@ const copy = {
     shoes: "Аяқкиім",
     oneSize: "Бірыңғай өлшем",
     selected: "Таңдалған сүзгілер",
+    priceAsc: "Баға ↑",
+    priceDesc: "Баға ↓",
     remove: (name: string) => `Алып тастау: ${name}`,
     invalidPrice: "Бастапқы баға соңғы бағадан аспауы керек.",
     invalidNumber: "Бағаны 0 ₸ бастап енгізіңіз.",
@@ -51,6 +55,8 @@ const copy = {
     shoes: "Shoes",
     oneSize: "One size",
     selected: "Selected filters",
+    priceAsc: "Price ↑",
+    priceDesc: "Price ↓",
     remove: (name: string) => `Remove: ${name}`,
     invalidPrice: "The minimum price must not exceed the maximum.",
     invalidNumber: "Enter a price of 0 ₸ or more.",
@@ -156,7 +162,7 @@ export function ShopFilters({
         <label className={s.sort}>
           <span className={s.srOnly}>{t.sort}</span>
           <select value={filters.sort} onChange={(event) => onChange({ ...filters, sort: event.target.value })}>
-            <option value="newest">{t.newest}</option><option value="price-asc">{t.priceAsc}</option><option value="price-desc">{t.priceDesc}</option>
+            <option value="newest">{t.newest}</option><option value="price-asc" aria-label={t.priceAsc}>{c.priceAsc}</option><option value="price-desc" aria-label={t.priceDesc}>{c.priceDesc}</option>
           </select>
         </label>
       </div>
