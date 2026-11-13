@@ -35,9 +35,11 @@ try {
   if (!data || typeof data !== 'object' || Array.isArray(data) || Object.keys(data).some(k => !categories.includes(k))) fail('Манифест содержит неизвестные поля.');
   for (const key of categories) if (!Array.isArray(data[key]) || data[key].some(item => typeof item !== 'string' || !item.trim() || /[\r\n]/.test(item))) fail(`Категория ${key} должна быть массивом непустых однострочных пунктов.`);
   const short = run('git', ['rev-parse', '--short=12', sha]);
-  const title = `Urbanmag ${env} v${version} · ${short}`;
+  const stage = env === 'dev' ? 'Подготовлено в dev' : 'Выпущено в prod';
+  const title = `${stage} · Urbanmag ${short} · v${version}`;
   const url = env === 'dev' ? 'https://dev-u.perricheno.com' : 'https://u.perricheno.com';
-  const body = categories.map(key => `## ${key}\n\n${data[key].length ? data[key].map(x => `- ${x.trim()}`).join('\n') : '- Нет.'}`).join('\n\n') + `\n\nПодготовлено в ${env} · Urbanmag ${short}\n${url}\n`;
+  const labels = {Added:'Добавлено', Improved:'Улучшено', Fixed:'Исправлено', Changed:'Изменено', Removed:'Удалено'};
+  const body = `${stage} · Urbanmag ${short}\n${url}\n\n` + categories.map(key => `## ${labels[key]}\n\n${data[key].length ? data[key].map(x => `- ${x.trim()}`).join('\n') : '- Нет.'}`).join('\n\n') + '\n';
   const tag = `${env}/v${version}`;
   const dir = mkdtempSync(join(tmpdir(), 'urbanmag-release-'));
   try {

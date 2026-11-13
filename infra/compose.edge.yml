@@ -1,6 +1,6 @@
 services:
   nginx:
-    image: nginx:1.27-alpine
+    image: nginx:1.30.6-alpine
     user: "${URBANMAG_UID:-1000}:${URBANMAG_GID:-1000}"
     restart: unless-stopped
     ports: ["127.0.0.1:8080:8080"]

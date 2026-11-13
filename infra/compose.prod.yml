@@ -46,6 +46,7 @@ services:
     volumes: ["uploads:/data/uploads"]
     depends_on:
       db: {condition: service_healthy}
+      web: {condition: service_healthy}
     networks: [private]
 volumes:
   pg: {}

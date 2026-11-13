@@ -10,6 +10,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN mkdir -p apps/web/public && npm run build --workspace @urbanmag/web
 
 FROM node:26-bookworm-slim AS runtime
+ARG VCS_REF=unknown
+LABEL org.opencontainers.image.source="https://github.com/Perricheno/store" org.opencontainers.image.revision=$VCS_REF
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0
 COPY --from=build /app/apps/web/.next/standalone ./
