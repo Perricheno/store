@@ -2,8 +2,9 @@ import { expect, test, type Page } from "@playwright/test";
 import type { Settings, StaffInsights } from "@urbanmag/core";
 
 // Earlier staff scenarios establish this password. Do not rotate the shared fixture.
+// This independent client has its own fixture IP; the complete suite shares one proxy.
 async function owner(page: Page) {
- const response = await page.request.post("/api/staff/auth/login", { headers: { Origin: "https://localhost:3443" }, data: { email: "owner@urbanmag.test", password: "Owner-permanent-password-2026!" } });
+ const response = await page.request.post("/api/staff/auth/login", { headers: { Origin: "https://localhost:3443", "x-real-ip": "127.0.0.52" }, data: { email: "owner@urbanmag.test", password: "Owner-permanent-password-2026!" } });
  expect(response.ok()).toBeTruthy();
  await page.goto("/staff");
  await expect(page.getByRole("heading", { name: "Сводка", exact: true })).toBeVisible();

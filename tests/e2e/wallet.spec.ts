@@ -104,7 +104,7 @@ test("funded buyer balance: confirmed account, mock invoice, wallet checkout and
   await page
     .getByRole("button", { name: "Выставить счёт", exact: true })
     .click();
-  await expect(page.getByRole("alert")).toContainText(
+  await expect(page.getByRole("main").getByRole("alert")).toContainText(
     "Повторите с теми же данными",
   );
   expect((await (await api.get("/api/wallet")).json()).topups).toHaveLength(1);
@@ -187,7 +187,7 @@ test("funded buyer balance: confirmed account, mock invoice, wallet checkout and
     }),
   );
   await page.reload();
-  await expect(page.getByRole("alert")).toContainText("Сумма не подтверждена");
+  await expect(page.getByRole("main").getByRole("alert")).toContainText("Сумма не подтверждена");
   await expect(page.getByTestId("wallet-balance")).toHaveCount(0);
   await page.unroute("**/api/wallet");
   await page.getByRole("button", { name: "Повторить", exact: true }).click();

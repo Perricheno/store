@@ -558,3 +558,10 @@
 .helpText { font-size: 14px; line-height: 1.8; margin: 0; max-width: 80ch; }
 .helpLinks { display: flex; flex-wrap: wrap; gap: 10px; }
 .tabs .button { flex-shrink: 0; }
+
+@media (pointer: coarse) {
+  .input:not([type="checkbox"]):not([type="radio"]),
+  .select {
+    font-size: 16px;
+  }
+}

@@ -15,3 +15,12 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 ## Витрина и корзина
 
 Компоненты витрины разделены по маршрутам в `src/components/shop-*.tsx`; общие элементы находятся в `shop-shell.tsx` и `shop-ui.tsx`, характеристики и быстрое добавление — в `shop-product-features.tsx`. Очередь и состояние корзины находятся в `src/lib/cart-store.ts`; ее тесты входят в `npm test` и отдельно запускаются из корня командой `npx tsx --test tests/cart-store.test.ts`. Публичные данные каталога подготавливает `src/lib/public-catalog.ts`.
+
+
+## Профиль, баланс и кабинет сотрудников
+
+- `src/components/shop-account.tsx` собирает профиль; `shop-buyer-orders.tsx`, `shop-buyer-history.tsx`, `shop-buyer-help.tsx` и `buyer-copy.ts` отвечают за покупки, локальную историю, подборки и помощь. `src/lib/buyer-device.ts` хранит правила истории и локальных отметок; `buyer-status.ts` — подписи состояний. Чистые проверки входят в `npm test` и запускаются отдельно через `npx tsx --test tests/buyer-device.test.ts`.
+- `src/app/api/buyer-products/route.ts` загружает до 24 опубликованных товаров через `getPublishedProductsBySlugs` из core: один запрос товаров и одна пакетная загрузка вариантов. Сохраняйте `publicProduct` для фильтрации скрытых характеристик.
+- Маршрут `src/app/[locale]/account/wallet/page.tsx` использует `shop-wallet.tsx`, `wallet-copy.ts` и `shop-wallet.module.css`; оплата с баланса встроена в `shop-checkout.tsx`. Финансовые правила и неизменяемый журнал находятся в `packages/core/src/wallet.ts`, сверка — в worker. Production-флаг по умолчанию выключен; ограничения описаны в `docs/wallet.md`.
+- `src/staff/dashboard.tsx` управляет навигацией и редакторами; `insights.tsx`, `marketing.tsx`, `help.tsx` — отдельные панели. Аналитика использует общий SQL-снимок `packages/core/src/staff-insights.ts`; подтверждение wallet-продажи требует соответствующей проводки без возврата. Сохраняйте одинаковые критерии production-оплаты и реальных строк для выручки и заказов в работе.
+- `npm test` включает core (в том числе аналитика, EAN-13 и финансовые сценарии), worker (ApiPay и сверка баланса), проверки безопасности, корзины и покупательской логики. Браузерные сценарии профиля, баланса, идентификаторов и кабинета находятся в `tests/e2e`.

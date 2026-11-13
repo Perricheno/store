@@ -38,3 +38,11 @@
 .orderId { font-family:monospace; font-size:12px; overflow-wrap:anywhere; color:#666; }
 @media(max-width:900px) { .shelf { grid-template-columns:repeat(3,minmax(0,1fr)); } }
 @media(max-width:520px) { .shelf { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; } .section { padding:20px 0; } .controls { align-items:start; flex-direction:column; } }
+
+@media (pointer: coarse) {
+  .lookup input,
+  .productTools input {
+    font-size: 16px;
+    min-height: 44px;
+  }
+}
