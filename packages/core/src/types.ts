@@ -65,6 +65,9 @@ export interface Order {
   paymentStatus?: string;
 }
 export interface Settings {
+  contentPages?: Partial<Record<"about" | "delivery" | "returns" | "privacy" | "terms", Record<Locale, string>>>;
+  announcement?: { enabled: boolean; text: Record<Locale, string>; href?: string };
+  banner?: { enabled: boolean; title: Record<Locale, string>; imageUrl?: string; href?: string };
   pickupCity: string;
   pickupAddress: string;
   pickupHours: string;

@@ -422,3 +422,27 @@
   display: flex;
   gap: 8px;
 }
+
+.promotionFields {
+  border: 1px solid #00000024;
+  border-radius: 12px;
+  padding: 18px;
+  min-width: 0;
+  display: grid;
+  gap: 14px;
+}
+.promotionFields legend { font-weight: 700; padding: 0 8px; }
+.promotionFields input { min-height: 44px; }
+.promotionFields input[type="checkbox"] { width: 22px; min-height: 22px; }
+.promotionFields .checks { min-height: 44px; }
+.bannerPreview { display: grid; gap: 12px; }
+.bannerPreview img { width: 100%; max-height: 200px; object-fit: contain; border-radius: 8px; }
+.bannerPreview button { min-height: 44px; }
+
+.contentEditor { border: 1px solid #00000024; border-radius: 12px; padding: 0 18px 18px; min-width: 0; }
+.contentEditor summary { min-height: 52px; display: flex; align-items: center; cursor: pointer; font-weight: 700; }
+.contentEditor[open] { display: grid; gap: 14px; }
+.contentEditor select { min-height: 44px; }
+.contentEditor textarea { min-height: 144px; resize: vertical; }
+.contentEditor summary::after { content: "+"; margin-left: auto; font-size: 20px; }
+.contentEditor[open] summary::after { content: "−"; }

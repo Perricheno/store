@@ -1,5 +1,6 @@
 import test, { after } from "node:test";
 import assert from "node:assert/strict";
+import type { Settings } from "../src/types";
 process.env.DATABASE_URL = process.env.CORE_TEST_DATABASE_URL || "";
 process.env.PGLITE_DATA_DIR = "memory://";
 process.env.APP_ENV = "test";
@@ -1149,4 +1150,57 @@ test("versioned 500-item seed upgrades the original catalog without changing use
     );
     await db.exec("DROP SCHEMA core_seed_upgrade_test CASCADE");
   });
+});
+
+test("store promotions require translated copy and safe local links and media", async () => {
+  const previous = await core.getSettings();
+  const text = { ru: "Новинки", kk: "Жаңалықтар", en: "New arrivals" };
+  try {
+    const updated = await core.updateSettings(actorId, {
+      ...previous,
+      announcement: { enabled: true, text, href: "/ru/catalog?category=shoes" },
+      banner: { enabled: true, title: text, imageUrl: `/api/media/${"a".repeat(64)}.webp` },
+    });
+    assert.deepEqual((await core.getSettings()).announcement, updated.announcement);
+    for (const href of ["https://example.test", "javascript:alert(1)", "//example.test", "/\\example.test", "/%2fexample.test", "/%255cexample.test", "/x\ny"]) {
+      await assert.rejects(() => core.updateSettings(actorId, {
+        ...previous, announcement: { enabled: true, text, href },
+      }), core.CoreError);
+    }
+    await assert.rejects(() => core.updateSettings(actorId, {
+      ...previous, announcement: { enabled: true, text: { ...text, kk: " " } },
+    }), core.CoreError);
+    await assert.rejects(() => core.updateSettings(actorId, {
+      ...previous, banner: { enabled: true, title: text, imageUrl: "https://example.test/banner.webp" },
+    }), core.CoreError);
+    const disabled = await core.updateSettings(actorId, {
+      ...previous, announcement: { enabled: false, text: { ru: "", kk: "", en: "" } },
+    });
+    assert.equal(disabled.announcement?.enabled, false);
+  } finally {
+    await core.updateSettings(actorId, previous);
+  }
+});
+
+test("owner content pages persist empty translations and edited plain text with a strict page structure", async () => {
+  const previous = await core.getSettings();
+  try {
+    const empty = { ru: "", kk: "", en: "" };
+    const about = { ru: "О магазине\nАдрес и команда", kk: "Дүкен туралы", en: "About the store" };
+    await core.updateSettings(actorId, { ...previous, contentPages: { about: empty, privacy: empty } });
+    assert.deepEqual((await core.getSettings()).contentPages?.about, empty);
+    await core.updateSettings(actorId, { ...previous, contentPages: { about, privacy: empty } });
+    assert.deepEqual((await core.getSettings()).contentPages, { about, privacy: empty });
+    for (const contentPages of [
+      { unknown: empty },
+      { about: { ...empty, extra: "unsupported" } },
+      { about: { ru: "Missing language", en: "Incomplete" } },
+      { about: { ...empty, ru: { html: "unsupported" } } },
+      { about: { ...empty, en: "x".repeat(20001) } },
+    ]) {
+      await assert.rejects(() => core.updateSettings(actorId, { ...previous, contentPages } as unknown as Settings), core.CoreError);
+    }
+  } finally {
+    await core.updateSettings(actorId, previous);
+  }
 });

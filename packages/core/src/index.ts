@@ -997,6 +997,37 @@ export async function getSettings(): Promise<Settings> {
   ).query("SELECT value FROM settings WHERE id='store'");
   return { ...row.value, kazpostEnabled: false };
 }
+const promotionTranslations = z.object({
+  ru: z.string().trim().max(300),
+  kk: z.string().trim().max(300),
+  en: z.string().trim().max(300),
+}).strict();
+// Root-relative links only. Reject encoded separators and controls as well as
+// their literal forms so browser URL normalization cannot change the origin.
+const promotionHref = z.string().trim().max(500).refine((value) => {
+  if (!value) return true;
+  if (!value.startsWith("/") || value.startsWith("//")) return false;
+  return !/[\\\x00-\x20\x7f]/.test(value) && !/%(?:2f|5c|0[0-9a-f]|1[0-9a-f]|20|7f|25)/i.test(value);
+}, "Use an internal path").optional();
+const announcementInput = z.object({
+  enabled: z.boolean(), text: promotionTranslations, href: promotionHref,
+}).strict().refine((value) => !value.enabled || Object.values(value.text).every(Boolean));
+const bannerInput = z.object({
+  enabled: z.boolean(), title: promotionTranslations, href: promotionHref,
+  imageUrl: z.string().regex(/^\/api\/media\/[a-f0-9]{64}\.webp$/).optional(),
+}).strict().refine((value) => !value.enabled || Object.values(value.title).every(Boolean));
+const contentPageTranslations = z.object({
+  ru: z.string().trim().max(20000),
+  kk: z.string().trim().max(20000),
+  en: z.string().trim().max(20000),
+}).strict();
+const contentPagesInput = z.object({
+  about: contentPageTranslations.optional(),
+  delivery: contentPageTranslations.optional(),
+  returns: contentPageTranslations.optional(),
+  privacy: contentPageTranslations.optional(),
+  terms: contentPageTranslations.optional(),
+}).strict();
 export async function updateSettings(
   actorId: string,
   input: Settings,
@@ -1004,6 +1035,9 @@ export async function updateSettings(
   await initCore();
   const value = parse(
     z.object({
+      contentPages: contentPagesInput.optional(),
+      announcement: announcementInput.optional(),
+      banner: bannerInput.optional(),
       pickupCity: z.string().trim().min(1).max(200),
       pickupAddress: z.string().trim().min(1).max(500),
       pickupHours: z.string().trim().min(1).max(300),

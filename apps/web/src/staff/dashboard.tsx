@@ -31,6 +31,20 @@ type Job = {
 
 const dict = {
   ru: {
+    contentPages: "Страницы",
+    contentPage: "Страница",
+    pageAbout: "О магазине",
+    pageDelivery: "Доставка и оплата",
+    pageReturns: "Возврат",
+    pagePrivacy: "Политика конфиденциальности",
+    pageTerms: "Условия использования",
+    announcement: "Объявление",
+    banner: "Баннер",
+    showPromotion: "Показывать на витрине",
+    promotionLink: "Ссылка внутри магазина (необязательно)",
+    bannerImage: "Изображение баннера",
+    removeImage: "Удалить изображение",
+    promotionHint: "Текст на всех трёх языках обязателен при включении.",
     workspace: "Команда",
     title: "Рабочее пространство",
     products: "Товары",
@@ -123,6 +137,20 @@ const dict = {
     noJobs: "Нет ожидающих или завершившихся с ошибкой задач",
   },
   kk: {
+    contentPages: "Беттер",
+    contentPage: "Бет",
+    pageAbout: "Дүкен туралы",
+    pageDelivery: "Жеткізу және төлем",
+    pageReturns: "Қайтару",
+    pagePrivacy: "Құпиялық саясаты",
+    pageTerms: "Пайдалану шарттары",
+    announcement: "Хабарландыру",
+    banner: "Баннер",
+    showPromotion: "Дүкенде көрсету",
+    promotionLink: "Дүкен ішіндегі сілтеме (міндетті емес)",
+    bannerImage: "Баннер суреті",
+    removeImage: "Суретті жою",
+    promotionHint: "Қосылғанда үш тілдегі мәтін міндетті.",
     workspace: "Команда",
     title: "Жұмыс кеңістігі",
     products: "Тауарлар",
@@ -215,6 +243,20 @@ const dict = {
     noJobs: "Күтіп тұрған немесе қатемен аяқталған тапсырмалар жоқ",
   },
   en: {
+    contentPages: "Pages",
+    contentPage: "Page",
+    pageAbout: "About the store",
+    pageDelivery: "Delivery and payment",
+    pageReturns: "Returns",
+    pagePrivacy: "Privacy policy",
+    pageTerms: "Terms of use",
+    announcement: "Announcement",
+    banner: "Banner",
+    showPromotion: "Show in storefront",
+    promotionLink: "Store link (optional)",
+    bannerImage: "Banner image",
+    removeImage: "Remove image",
+    promotionHint: "Text in all three languages is required when enabled.",
     workspace: "Team",
     title: "Workspace",
     products: "Products",
@@ -347,6 +389,9 @@ export function Dashboard() {
     currentProductPage * 24,
   );
   const [orders, setOrders] = useState<Order[]>([]);
+  const [contentPage, setContentPage] = useState<"about" | "delivery" | "returns" | "privacy" | "terms">("about");
+  const [contentDraft, setContentDraft] = useState<Settings["contentPages"]>();
+  const [bannerImage, setBannerImage] = useState<string | undefined>();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [integration, setIntegration] = useState<Record<string, unknown>>({});
@@ -847,6 +892,18 @@ export function Dashboard() {
                       pickupAddress: f.get("pickupAddress"),
                       pickupHours: f.get("pickupHours"),
                       kazpostEnabled: false,
+                      contentPages: contentDraft ?? settings.contentPages,
+                      announcement: {
+                        enabled: f.get("announcementEnabled") === "on",
+                        text: Object.fromEntries((["ru", "kk", "en"] as const).map((language) => [language, String(f.get(`announcement_${language}`) || "")])),
+                        href: String(f.get("announcementHref") || ""),
+                      },
+                      banner: {
+                        enabled: f.get("bannerEnabled") === "on",
+                        title: Object.fromEntries((["ru", "kk", "en"] as const).map((language) => [language, String(f.get(`banner_${language}`) || "")])),
+                        href: String(f.get("bannerHref") || ""),
+                        imageUrl: (bannerImage ?? settings.banner?.imageUrl) || undefined,
+                      },
                     }),
                   );
                   setNotice(t.save);
@@ -868,6 +925,74 @@ export function Dashboard() {
                   </label>
                 ),
               )}
+              {(["announcement", "banner"] as const).map((kind) => (
+                <fieldset className={s.promotionFields} key={kind} disabled={user.role !== "owner" || busy}>
+                  <legend>{t[kind]}</legend>
+                  <label className={s.checks}>
+                    <input type="checkbox" name={`${kind}Enabled`} defaultChecked={settings[kind]?.enabled ?? false} />
+                    {t.showPromotion}
+                  </label>
+                  <p className={s.muted}>{t.promotionHint}</p>
+                  {(["ru", "kk", "en"] as const).map((language) => (
+                    <label className={s.field} key={language}>
+                      {language.toUpperCase()}
+                      <input className={s.input} name={`${kind}_${language}`} maxLength={300}
+                        defaultValue={kind === "announcement" ? settings.announcement?.text[language] : settings.banner?.title[language]} />
+                    </label>
+                  ))}
+                  <label className={s.field}>
+                    {t.promotionLink}
+                    <input className={s.input} name={`${kind}Href`} maxLength={500} placeholder="/ru" defaultValue={settings[kind]?.href} />
+                  </label>
+                  {kind === "banner" && <>
+                    <label className={s.field}>{t.bannerImage}
+                      <input className={s.input} type="file" accept="image/jpeg,image/png,image/webp,image/avif" onChange={async (event) => {
+                        const file = event.target.files?.[0];
+                        if (!file) return;
+                        await run(async () => {
+                          const form = new FormData();
+                          form.set("file", file);
+                          const response = await fetch("/api/staff/uploads", { method: "POST", body: form });
+                          const data = await response.json();
+                          if (!response.ok) throw new Error(data.error);
+                          setBannerImage(data.url);
+                        });
+                        event.target.value = "";
+                      }} />
+                    </label>
+                    {(bannerImage ?? settings.banner?.imageUrl) && <div className={s.bannerPreview}>
+                      <img src={bannerImage ?? settings.banner?.imageUrl} alt="" />
+                      <button type="button" className={s.button} onClick={() => {
+                        setBannerImage("");
+                        setSettings((current) => current ? { ...current, banner: current.banner ? { ...current.banner, imageUrl: undefined } : undefined } : current);
+                      }}>{t.removeImage}</button>
+                    </div>}
+                  </>}
+                </fieldset>
+              ))}
+              <details className={s.contentEditor}>
+                <summary>{t.contentPages}</summary>
+                <label className={s.field}>{t.contentPage}
+                  <select className={s.select} value={contentPage} onChange={(event) => setContentPage(event.target.value as typeof contentPage)}>
+                    {(["about", "delivery", "returns", "privacy", "terms"] as const).map((key, index) =>
+                      <option value={key} key={key}>{[t.pageAbout, t.pageDelivery, t.pageReturns, t.pagePrivacy, t.pageTerms][index]}</option>)}
+                  </select>
+                </label>
+                {(["ru", "kk", "en"] as const).map((language) => (
+                  <label className={s.field} key={language}>{language.toUpperCase()}
+                    <textarea className={s.input} name={`content_${contentPage}_${language}`} rows={6} maxLength={20000}
+                      disabled={user.role !== "owner" || busy}
+                      value={(contentDraft ?? settings.contentPages)?.[contentPage]?.[language] ?? ""}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        setContentDraft((current) => {
+                          const pages = current ?? settings.contentPages ?? {};
+                          return { ...pages, [contentPage]: { ru: "", kk: "", en: "", ...pages[contentPage], [language]: value } };
+                        });
+                      }} />
+                  </label>
+                ))}
+              </details>
               <p className={s.muted}>{t.shipping}</p>
               {user.role === "owner" && (
                 <button className={`${s.button} ${s.primary}`} disabled={busy}>
