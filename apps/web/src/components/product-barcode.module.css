@@ -1,0 +1,6 @@
+.barcode {
+  background: white;
+  color: black;
+  fill: currentColor;
+  max-width: 100%;
+}
