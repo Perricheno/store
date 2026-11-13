@@ -1,0 +1,183 @@
+.quickAdd {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 50%;
+  background: #fff;
+  color: #111;
+  box-shadow: 0 3px 14px #00000015;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    transform 0.15s;
+}
+.quickAdd:hover:not(:disabled) {
+  background: #111;
+  color: #fff;
+  transform: scale(1.05);
+}
+.quickAdd:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.quickAdd:focus-visible,
+.sizeDialog button:focus-visible {
+  outline: 3px solid #e5252a;
+  outline-offset: 3px;
+}
+.promotion {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 6px 10px;
+  background: #e5252a;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.promotionOverlay {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  z-index: 1;
+  max-width: calc(100% - 76px);
+}
+.sizeDialog {
+  width: min(380px, calc(100vw - 32px));
+  max-height: calc(100dvh - 40px);
+  margin: auto;
+  padding: 22px;
+  border: 1px solid #e5e5e5;
+  border-radius: 18px;
+  background: #fff;
+  color: #111;
+  box-shadow: 0 18px 60px #0003;
+}
+.sizeDialog::backdrop {
+  background: #0006;
+  backdrop-filter: blur(4px);
+}
+.dialogHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.dialogHead h2 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.3;
+}
+.dialogHead button {
+  display: grid;
+  place-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: #f5f5f5;
+  color: #111;
+  cursor: pointer;
+}
+.dialogProduct {
+  margin: 8px 0 20px;
+  color: #666;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.sizes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sizes button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 52px;
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fff;
+  color: #111;
+  font: inherit;
+  cursor: pointer;
+}
+.sizes button:hover {
+  border-color: #111;
+  background: #f5f5f5;
+}
+.sizes small {
+  font-size: 11px;
+  color: #666;
+}
+.cardError {
+  position: absolute;
+  left: 10px;
+  bottom: 64px;
+  right: 10px;
+  z-index: 3;
+  padding: 8px;
+  background: #fff;
+  color: #b31920;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.specifications {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid #e5e5e5;
+}
+.specifications h2 {
+  margin: 0 0 16px;
+  font-size: 14px;
+  font-weight: 700;
+}
+.specifications dl {
+  margin: 0;
+}
+.specifications dl > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+  gap: 16px;
+  padding: 11px 0;
+  border-bottom: 1px solid #eee;
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.specifications dt {
+  color: #666;
+}
+.specifications dd {
+  margin: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .quickAdd {
+    transition: none;
+  }
+}

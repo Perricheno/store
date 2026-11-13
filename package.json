@@ -15,7 +15,7 @@
     "start": "node scripts/run-next.mjs start",
     "worker": "node --import tsx scripts/run-worker.mjs",
     "typecheck": "tsc --noEmit -p apps/web/tsconfig.json && tsc --noEmit -p packages/core/tsconfig.json",
-    "test": "npm run test --workspace @urbanmag/core && npm run test --workspace @urbanmag/worker && tsx --test tests/security.test.ts",
+    "test": "npm run test --workspace @urbanmag/core && npm run test --workspace @urbanmag/worker && tsx --test tests/security.test.ts tests/cart-store.test.ts",
     "test:e2e": "playwright test",
     "bootstrap": "node scripts/bootstrap.mjs",
     "db:migrate": "tsx scripts/migrate.ts"

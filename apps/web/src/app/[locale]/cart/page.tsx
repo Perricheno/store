@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getSettings } from "@urbanmag/core";
-import { CartView } from "@/components/shop";
+import { CartView } from "@/components/shop-cart";
 import { isLocale } from "@/lib/config";
 import { initialCart } from "@/lib/server-cart";
 export const dynamic = "force-dynamic";

@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation";
 import { getCatalogPage, getSettings } from "@urbanmag/core";
-import { Storefront } from "@/components/shop";
+import { Storefront } from "@/components/shop-storefront";
 import { isLocale } from "@/lib/config";
 import { categoryMetadata } from "@/lib/seo";
+import { initialCart } from "@/lib/server-cart";
+import { publicCatalog } from "@/lib/public-catalog";
 import {
   CATALOG_PAGE_SIZE,
   categoryName,
@@ -30,14 +32,16 @@ export default async function Page({
   const { locale, slug } = await params;
   if (!isLocale(locale) || !categoryName(locale, slug)) notFound();
   const filters = catalogFiltersFromSearch(await searchParams, slug);
-  const [catalog, settings] = await Promise.all([
+  const [rawCatalog, settings, cart] = await Promise.all([
     getCatalogPage({
       ...catalogCoreFilters(filters),
       page: 1,
       pageSize: CATALOG_PAGE_SIZE,
     }),
     getSettings(),
+    initialCart(),
   ]);
+  const catalog = publicCatalog(rawCatalog);
   return (
     <Storefront
       locale={locale}
@@ -46,6 +50,7 @@ export default async function Page({
       initialFilters={filters}
       initialCategory={slug}
       settings={settings}
+      initialCart={cart}
     />
   );
 }

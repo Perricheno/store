@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getSettings } from "@urbanmag/core";
-import { CheckoutView } from "@/components/shop";
+import { CheckoutView } from "@/components/shop-checkout";
 import { isLocale } from "@/lib/config";
 import { initialCart } from "@/lib/server-cart";
 export const dynamic = "force-dynamic";
@@ -13,5 +13,7 @@ export default async function Page({
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
   const [settings, cart] = await Promise.all([getSettings(), initialCart()]);
-  return <CheckoutView locale={locale} settings={settings} initialCart={cart} />;
+  return (
+    <CheckoutView locale={locale} settings={settings} initialCart={cart} />
+  );
 }

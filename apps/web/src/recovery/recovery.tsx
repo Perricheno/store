@@ -2,7 +2,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import type { Locale } from "@/lib/config";
-import { ShopShell } from "@/components/shop";
+import { ShopShell } from "@/components/shop-shell";
 import s from "@/staff/dashboard.module.css";
 const copy = {
   ru: {

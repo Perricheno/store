@@ -64,6 +64,7 @@
 .main {
   width: 100%;
   flex: 1;
+  min-height: calc(100svh - 88px);
 }
 .main:has(.empty) {
   flex: none;
@@ -487,6 +488,7 @@
   aspect-ratio: 1 / 1.1;
   overflow: hidden;
   background: rgba(0, 0, 0, 0.025);
+  content-visibility: auto;
 }
 .garment {
   display: block;
@@ -528,9 +530,9 @@
 }
 .gleam {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  left: -35%;
+  top: -50%;
+  bottom: -50%;
+  left: -60%;
   width: 16.4%;
   background: #fff;
   pointer-events: none;
@@ -544,10 +546,10 @@
 }
 @keyframes gleam {
   from {
-    transform: translate3d(0, 0, 0);
+    transform: translate3d(0, 0, 0) rotate(45deg);
   }
   to {
-    transform: translate3d(1050%, 0, 0);
+    transform: translate3d(1350%, 0, 0) rotate(45deg);
   }
 }
 .favorite {
@@ -1830,7 +1832,9 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   height: 64px;
   padding: 5px 8px;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
   border: 1px solid var(--line);
   border-radius: 24px;
   box-shadow: 0 5px 24px rgba(0, 0, 0, 0.14);
@@ -3140,5 +3144,28 @@
   }
   .cartControls {
     gap: 0 12px;
+  }
+}
+
+@media (max-width: 767px) {
+  .main {
+    min-height: calc(100svh - 64px);
+  }
+  .header {
+    position: sticky;
+    top: 0;
+    z-index: 25;
+  }
+  .footer:not([data-mobile-profile="true"]) {
+    display: none;
+  }
+}
+@media (hover: none) and (pointer: coarse) {
+  .shop button:active:not(:disabled),
+  .bottomNav a:active {
+    transform: scale(0.97);
+  }
+  .cardImage:hover .garment {
+    transform: none;
   }
 }

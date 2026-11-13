@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation";
 import { cache } from "react";
-import { getProduct, getSettings } from "@urbanmag/core";
-import { ProductDetail } from "@/components/shop";
+import { getProduct, getSettings, publicProduct } from "@urbanmag/core";
+import { ProductDetail } from "@/components/shop-product-detail";
 import { isLocale, shopOrigin } from "@/lib/config";
 import { JsonLd, pageMetadata } from "@/lib/seo";
+import { initialCart } from "@/lib/server-cart";
 const productBySlug = cache(getProduct);
 export const dynamic = "force-dynamic";
 export async function generateMetadata({
@@ -31,7 +32,8 @@ export default async function ProductPage({
   if (!isLocale(locale)) notFound();
   const product = await productBySlug(slug);
   if (!product || !product.published) notFound();
-  const settings = await getSettings();
+  const [settings, cart] = await Promise.all([getSettings(), initialCart()]);
+  const visibleProduct = publicProduct(product);
   const origin = shopOrigin();
   const data = {
     "@context": "https://schema.org",
@@ -39,6 +41,11 @@ export default async function ProductPage({
     name: product.names[locale],
     description: product.description[locale],
     sku: product.id,
+    additionalProperty: visibleProduct.details.map((detail) => ({
+      "@type": "PropertyValue",
+      name: detail.label[locale],
+      value: detail.value[locale],
+    })),
     ...(product.media.length
       ? { image: product.media.map((p) => new URL(p, origin).href) }
       : {}),
@@ -56,7 +63,12 @@ export default async function ProductPage({
   return (
     <>
       {!product.isDemo && <JsonLd data={data} />}
-      <ProductDetail locale={locale} product={product} settings={settings} />
+      <ProductDetail
+        locale={locale}
+        product={visibleProduct}
+        settings={settings}
+        initialCart={cart}
+      />
     </>
   );
 }

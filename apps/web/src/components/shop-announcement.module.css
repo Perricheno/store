@@ -1,0 +1,87 @@
+.strip {
+  display: flex;
+  min-height: 44px;
+  background: #111;
+  color: #fff;
+  overflow: hidden;
+}
+.content {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+}
+.track {
+  display: flex;
+  width: max-content;
+  animation: marquee 28s linear infinite;
+}
+.group {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 48px;
+  min-width: 100vw;
+  padding: 0 24px;
+  flex-shrink: 0;
+}
+.group > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 48px;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+}
+.separator {
+  color: #e60012;
+  font-size: 18px;
+  font-weight: 700;
+}
+.pause {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.2);
+  background: #111;
+  color: #fff !important;
+}
+.paused .track,
+.strip:hover .track,
+.strip:focus-within .track {
+  animation-play-state: paused;
+}
+@keyframes marquee {
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .track {
+    animation: none;
+    width: 100%;
+  }
+  .group {
+    min-width: 0;
+    width: 100%;
+    justify-content: flex-start;
+    padding: 0 16px;
+  }
+  .group > span {
+    min-width: 0;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .group:nth-child(n + 2),
+  .group > span:nth-child(n + 2),
+  .separator,
+  .pause {
+    display: none;
+  }
+}

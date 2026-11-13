@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { isLocale } from "@/lib/config";
-import { ShopShell } from "@/components/shop";
+import { ShopShell } from "@/components/shop-shell";
 import { getSettings } from "@urbanmag/core";
 import s from "@/components/shop.module.css";
 export const dynamic = "force-dynamic";
