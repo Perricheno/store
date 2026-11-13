@@ -1,0 +1,45 @@
+{
+  "version": "dev/v0.2.0",
+  "measuredAt": "2026-11-13T20:00:40.773Z",
+  "lighthouseVersion": "13.6.0",
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/158.0.0.0 Safari/537.36",
+  "throttlingMethod": "simulate",
+  "throttling": {
+    "rttMs": 150,
+    "throughputKbps": 1638.4,
+    "requestLatencyMs": 562.5,
+    "downloadThroughputKbps": 1474.5600000000002,
+    "uploadThroughputKbps": 675,
+    "cpuSlowdownMultiplier": 4
+  },
+  "screenEmulation": {
+    "mobile": true,
+    "width": 412,
+    "height": 823,
+    "deviceScaleFactor": 1.75,
+    "disabled": false
+  },
+  "fixture": "Isolated HTTPS production build; 500 sample products; no product photographs",
+  "scores": {
+    "performance": 94,
+    "accessibility": 100,
+    "best-practices": 100
+  },
+  "metrics": {
+    "lcpMs": 1559.97,
+    "totalBlockingTimeMs": 275.5,
+    "cls": 0
+  },
+  "baseline": {
+    "version": "dev/v0.1.0",
+    "performance": 78,
+    "lcpMs": 1667,
+    "totalBlockingTimeMs": 923,
+    "cls": 0
+  },
+  "limitations": [
+    "One lab run per candidate; variation is expected.",
+    "Not a public network or production capacity benchmark.",
+    "Real product images and provider connections need their own verification."
+  ]
+}

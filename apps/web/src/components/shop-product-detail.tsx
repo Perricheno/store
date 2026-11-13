@@ -40,6 +40,7 @@ export function ProductDetail({
   const t = dictionary(locale),
     copy = catalogCopy[locale];
   const [imageIndex, setImageIndex] = useState(0);
+  const [ready, setReady] = useState(false);
   const [variant, setVariant] = useState(""),
     [busy, setBusy] = useState(false),
     [added, setAdded] = useState(false),
@@ -52,6 +53,7 @@ export function ProductDetail({
   const sizeGroup = useRef<HTMLDivElement>(null);
   const inStock = product.sizes.some((v) => v.available > 0);
   const name = product.names[locale] || product.names.ru;
+  useEffect(() => setReady(true), []);
   useEffect(() => {
     setImageIndex(0);
     setVariant("");
@@ -146,6 +148,7 @@ export function ProductDetail({
               <div className={s.galleryArrows}>
                 <button
                   className={s.iconButton}
+                  disabled={!ready}
                   onClick={() =>
                     setImageIndex(
                       (index) =>
@@ -159,6 +162,7 @@ export function ProductDetail({
                 </button>
                 <button
                   className={s.iconButton}
+                  disabled={!ready}
                   onClick={() =>
                     setImageIndex((index) => (index + 1) % product.media.length)
                   }
@@ -175,6 +179,7 @@ export function ProductDetail({
                 <button
                   key={`${source}:${index}`}
                   className={imageIndex === index ? s.activeThumbnail : ""}
+                  disabled={!ready}
                   onClick={() => setImageIndex(index)}
                   aria-label={copy.photo(index + 1)}
                   aria-pressed={imageIndex === index}
@@ -225,7 +230,7 @@ export function ProductDetail({
                 <button
                   key={v.id}
                   className={`${s.sizeButton} ${variant === v.id ? s.selectedSize : ""}`}
-                  disabled={busy || !v.available}
+                  disabled={!ready || busy || !v.available}
                   aria-pressed={variant === v.id}
                   onClick={() => {
                     setVariant(v.id);
@@ -247,7 +252,7 @@ export function ProductDetail({
             <button
               className={s.primaryButton}
               onClick={add}
-              disabled={busy || !inStock}
+              disabled={!ready || busy || !inStock}
             >
               {!inStock ? t.soldOut : added ? t.addedCart : t.addCart}
               {added ? (
@@ -306,7 +311,7 @@ export function ProductDetail({
         <button
           className={s.primaryButton}
           onClick={add}
-          disabled={busy || !inStock}
+          disabled={!ready || busy || !inStock}
         >
           {!inStock ? t.soldOut : added ? t.addedCart : t.addCart}
           {added ? <Check size={20} weight="bold" /> : <Plus size={20} />}

@@ -176,11 +176,13 @@ export function ProductQuickAdd({
   const t = dictionary(locale);
   const open = useContext(QuickAddContext);
   const lock = useRef(false);
+  const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [added, setAdded] = useState(false);
   const [error, setError] = useState(false);
   const available = product.sizes.filter((variant) => variant.available > 0);
   const name = localized(product.names, locale);
+  useEffect(() => setReady(true), []);
   async function add(variant: Product["sizes"][number]) {
     if (lock.current) return;
     lock.current = true;
@@ -202,7 +204,7 @@ export function ProductQuickAdd({
       <button
         type="button"
         className={f.quickAdd}
-        disabled={busy || !available.length}
+        disabled={!ready || busy || !available.length}
         aria-label={`${added ? t.addedCart : available.length ? t.addCart : t.soldOut}: ${name}`}
         aria-haspopup={available.length > 1 ? "dialog" : undefined}
         onClick={(event) => {

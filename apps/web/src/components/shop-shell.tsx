@@ -181,7 +181,11 @@ export function StoreHeader({ locale, initialCart }: Common) {
             href={href}
             prefetch={false}
             aria-current={active ? "page" : undefined}
-            aria-label={label}
+            aria-label={
+              href.endsWith("/cart") && cart.items.length
+                ? `${label} (${cart.items.reduce((total, item) => total + item.quantity, 0)})`
+                : label
+            }
           >
             <span className={s.navIcon}>
               <NavIcon size={25} weight="bold" />

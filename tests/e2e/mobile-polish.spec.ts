@@ -1,5 +1,34 @@
 import { expect, test } from "@playwright/test";
 
+test("mobile bag announces its quantity after quick add and reload", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/ru?q=City");
+  await page
+    .getByRole("button", {
+      name: "Добавить в корзину: Футболка City",
+      exact: true,
+    })
+    .click();
+  const saved = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/cart") &&
+      response.request().method() === "POST",
+  );
+  await page
+    .getByRole("dialog", { name: "Выберите размер" })
+    .getByRole("button", { name: "M", exact: true })
+    .click();
+  expect((await saved).ok()).toBeTruthy();
+  const bag = page
+    .locator('nav[class*="bottomNav"]')
+    .getByRole("link", { name: "Корзина (1)", exact: true });
+  await expect(bag).toBeVisible();
+  await page.reload();
+  await expect(bag).toBeVisible();
+});
+
 test("mobile footer is reserved for the profile and the header stays visible", async ({
   browser,
 }) => {
