@@ -1,0 +1,21 @@
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    user: "${URBANMAG_UID:-1000}:${URBANMAG_GID:-1000}"
+    restart: unless-stopped
+    ports: ["127.0.0.1:8080:8080"]
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ${URBANMAG_SECRET_DIR:?Set URBANMAG_SECRET_DIR}/dev.htpasswd:/run/secrets/dev.htpasswd:ro
+    networks: [prod, dev]
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    user: "${URBANMAG_UID:-1000}:${URBANMAG_GID:-1000}"
+    restart: unless-stopped
+    network_mode: host
+    command: ["tunnel", "--no-autoupdate", "run", "--token-file", "/run/secrets/tunnel-token"]
+    volumes:
+      - ${URBANMAG_SECRET_DIR:?Set URBANMAG_SECRET_DIR}/tunnel-token:/run/secrets/tunnel-token:ro
+networks:
+  prod: {external: true, name: urbanmag-prod-frontend}
+  dev: {external: true, name: urbanmag-dev-frontend}

@@ -1,0 +1,58 @@
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: urbanmag
+      POSTGRES_USER: urbanmag
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes: ["pg:/var/lib/postgresql"]
+    networks: [private]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U urbanmag -d urbanmag"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  web:
+    image: node:26-bookworm-slim
+    working_dir: /app
+    command: ["sh", "-c", "npm ci && npm run dev --workspace @urbanmag/web -- --hostname 0.0.0.0"]
+    env_file: ../.env.dev
+    environment:
+      APP_ENV: development
+      DATABASE_URL: postgresql://urbanmag:${POSTGRES_PASSWORD}@db:5432/urbanmag
+      UPLOADS_DIR: /data/uploads
+      NODE_ENV: development
+    volumes: ["..:/app", "node_modules:/app/node_modules", "uploads:/data/uploads"]
+    depends_on:
+      db: {condition: service_healthy}
+    networks:
+      private: {}
+      frontend: {aliases: [urbanmag-dev-web]}
+  worker:
+    restart: unless-stopped
+    image: node:26-bookworm-slim
+    working_dir: /app
+    command: ["sh", "-c", "until [ -x node_modules/.bin/tsx ]; do sleep 2; done; ./node_modules/.bin/tsx apps/worker/src/index.ts"]
+    env_file: ../.env.dev
+    environment:
+      APP_ENV: development
+      DATABASE_URL: postgresql://urbanmag:${POSTGRES_PASSWORD}@db:5432/urbanmag
+      NODE_ENV: development
+    volumes: ["..:/app", "node_modules:/app/node_modules", "uploads:/data/uploads"]
+    depends_on:
+      db: {condition: service_healthy}
+    networks: [private]
+  mailpit:
+    image: axllent/mailpit:latest
+    networks: [private]
+    ports: ["127.0.0.1:8025:8025"]
+volumes:
+  pg: {}
+  uploads: {}
+  node_modules: {}
+networks:
+  private: {}
+  frontend:
+    external: true
+    name: urbanmag-dev-frontend

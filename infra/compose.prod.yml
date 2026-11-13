@@ -1,0 +1,57 @@
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: urbanmag
+      POSTGRES_USER: urbanmag
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes: ["pg:/var/lib/postgresql"]
+    networks: [private]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U urbanmag -d urbanmag"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  web:
+    image: ${IMAGE_TAG:?Set immutable IMAGE_TAG}
+    restart: unless-stopped
+    env_file: ../.env.prod
+    environment:
+      APP_ENV: production
+      DATABASE_URL: postgresql://urbanmag:${POSTGRES_PASSWORD}@db:5432/urbanmag
+      UPLOADS_DIR: /data/uploads
+      HOSTNAME: 0.0.0.0
+      PORT: 3000
+    volumes: ["uploads:/data/uploads"]
+    depends_on:
+      db: {condition: service_healthy}
+    networks:
+      private: {}
+      frontend: {aliases: [urbanmag-prod-web]}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+  worker:
+    image: ${IMAGE_TAG:?Set immutable IMAGE_TAG}
+    restart: unless-stopped
+    command: ["./node_modules/.bin/tsx", "apps/worker/src/index.ts"]
+    env_file: ../.env.prod
+    environment:
+      APP_ENV: production
+      DATABASE_URL: postgresql://urbanmag:${POSTGRES_PASSWORD}@db:5432/urbanmag
+      UPLOADS_DIR: /data/uploads
+    volumes: ["uploads:/data/uploads"]
+    depends_on:
+      db: {condition: service_healthy}
+    networks: [private]
+volumes:
+  pg: {}
+  uploads: {}
+networks:
+  private: {internal: false}
+  frontend:
+    external: true
+    name: urbanmag-prod-frontend

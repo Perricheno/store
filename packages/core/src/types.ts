@@ -1,0 +1,88 @@
+export type Locale = "ru" | "kk" | "en";
+export type Translations = Record<Locale, string>;
+export type Role = "customer" | "manager" | "owner";
+export interface User {
+  id: string;
+  email: string;
+  role: Role;
+  mustChangePassword: boolean;
+}
+export interface Product {
+  id: string;
+  slug: string;
+  category: string;
+  gender: string;
+  brand: string;
+  names: Translations;
+  description: Translations;
+  price: number;
+  oldPrice?: number;
+  media: string[];
+  sizes: Array<{ id: string; size: string; color: string; available: number }>;
+  kaspiUrl?: string;
+  isDemo: boolean;
+  published: boolean;
+  createdAt: string;
+}
+export interface CartItem {
+  variantId: string;
+  quantity: number;
+  product: Product;
+  size: string;
+  color: string;
+  available: number;
+  lineTotal: number;
+}
+export interface Cart {
+  items: CartItem[];
+  total: number;
+  count: number;
+}
+export interface OrderLine {
+  productId: string;
+  variantId: string;
+  name: string;
+  names: Translations;
+  size: string;
+  color: string;
+  price: number;
+  quantity: number;
+  media: string[];
+  isDemo: boolean;
+}
+export interface Order {
+  id: string;
+  status: string;
+  total: number;
+  lines: OrderLine[];
+  email: string;
+  phone: string;
+  fulfillment: "pickup";
+  locale: Locale;
+  createdAt: string;
+  expiresAt: string;
+  paymentUrl?: string;
+  paymentStatus?: string;
+}
+export interface Settings {
+  pickupCity: string;
+  pickupAddress: string;
+  pickupHours: string;
+  kazpostEnabled: false;
+}
+export interface Job {
+  id: string;
+  type: string;
+  payload: Record<string, unknown>;
+  attempts: number;
+}
+export class CoreError extends Error {
+  constructor(
+    public status: number,
+    public code: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = "CoreError";
+  }
+}
