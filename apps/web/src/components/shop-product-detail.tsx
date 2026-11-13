@@ -24,6 +24,7 @@ import {
   pickupAddress,
 } from "./shop-client";
 import { ShopShell } from "./shop-shell";
+import { ProductSharing } from "./shop-product-sharing";
 import { ProductMedia } from "./shop-media";
 import { ErrorNotice } from "./shop-ui";
 import {
@@ -111,6 +112,7 @@ export function ProductDetail({
         productId: product.id,
       });
       setFavorite(data.productIds.includes(product.id));
+      window.dispatchEvent(new Event("urbanmag:favorites"));
     } catch {
       setError(t.error);
     } finally {
@@ -296,6 +298,7 @@ export function ProductDetail({
               </p>
             </div>
           )}
+          <ProductSharing product={product} locale={locale} variantId={variant} />
           <ProductSpecifications product={product} locale={locale} />
           <div className={s.pickupLine}>
             <MapPin size={20} weight="bold" />

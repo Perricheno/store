@@ -3,11 +3,16 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { ArrowRight, Check, User, SignOut } from "@phosphor-icons/react";
-import { dictionary, money } from "../lib/i18n";
+import { dictionary } from "../lib/i18n";
 import s from "./shop.module.css";
 import { type Common, type Order } from "./shop-types";
-import { request, post, statusLabel } from "./shop-client";
+import { request, post } from "./shop-client";
 import { ShopShell } from "./shop-shell";
+import { BuyerHistory } from "./shop-buyer-history";
+import { BuyerHelp } from "./shop-buyer-help";
+import { BuyerOrders } from "./shop-buyer-orders";
+import { buyerCopy } from "./buyer-copy";
+import bs from "./shop-buyer.module.css";
 import { PageTitle, ErrorNotice } from "./shop-ui";
 
 export type AccountUser = {
@@ -19,7 +24,7 @@ export type AccountUser = {
 };
 
 export function AccountView({ locale, settings, initialCart }: Common) {
-  const t = dictionary(locale);
+  const t = dictionary(locale), copy = buyerCopy[locale];
   const [user, setUser] = useState<AccountUser | null>(null),
     [orders, setOrders] = useState<Order[]>([]),
     [loading, setLoading] = useState(true),
@@ -34,6 +39,7 @@ export function AccountView({ locale, settings, initialCart }: Common) {
     try {
       const data = await request<{ user: AccountUser | null }>("/api/auth/me");
       setUser(data.user);
+      if (!data.user || data.user.mustChangePassword) setOrders([]);
       if (data.user && !data.user.mustChangePassword) {
         const result = await request<Order[] | { orders: Order[] }>(
           "/api/account/orders",
@@ -42,12 +48,13 @@ export function AccountView({ locale, settings, initialCart }: Common) {
       }
     } catch {
       setError(t.error);
+      throw new Error("Account refresh failed");
     } finally {
       setLoading(false);
     }
   }, [t.error]);
   useEffect(() => {
-    void load();
+    void load().catch(() => {});
   }, [load]);
   async function login(e: FormEvent) {
     e.preventDefault();
@@ -172,49 +179,14 @@ export function AccountView({ locale, settings, initialCart }: Common) {
             </aside>
             <div className={s.accountContent}>
               {error && <ErrorNotice text={error} />}
-              <section className={s.accountSection}>
-                <h2>
-                  {t.orders}
-                  <span>{orders.length.toString().padStart(2, "0")}</span>
-                </h2>
-                {orders.length ? (
-                  <div className={s.orders}>
-                    {orders.map((order) => (
-                      <div className={s.orderRow} key={order.id}>
-                        <div>
-                          <strong>
-                            #
-                            {order.number || order.id.slice(0, 8).toUpperCase()}
-                          </strong>
-                          {order.createdAt && (
-                            <time>
-                              {new Date(order.createdAt).toLocaleDateString(
-                                locale === "kk"
-                                  ? "kk-KZ"
-                                  : locale === "en"
-                                    ? "en-GB"
-                                    : "ru-RU",
-                              )}
-                            </time>
-                          )}
-                        </div>
-                        <span
-                          className={
-                            order.paymentStatus === "paid"
-                              ? s.paidStatus
-                              : s.orderStatus
-                          }
-                        >
-                          {statusLabel(order, locale)}
-                        </span>
-                        <strong>{money(order.total, locale)}</strong>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className={s.noOrders}>{t.noOrders}</p>
-                )}
-              </section>
+              {!mustChange && <>
+                <nav className={bs.accountNav} aria-label={copy.profile}>
+                  <a href="#purchases">{copy.purchases}</a><a href="#notifications">{copy.notifications}</a><a href="#check-order">{copy.checkOrder}</a>
+                  <Link prefetch={false} href={`/${locale}/account/wallet`}>{locale === "ru" ? "Баланс" : locale === "kk" ? "Баланс" : "Balance"}</Link>
+                  <a href="#history">{copy.viewed}</a><a href="#help">{copy.help}</a>
+                </nav>
+                <BuyerOrders userId={user.id} orders={orders} locale={locale} busy={busy} refresh={async () => { setBusy(true); setError(""); try { await load(); } finally { setBusy(false); } }} />
+              </>}
               <section className={s.accountSection}>
                 <h2>{t.changePassword}</h2>
                 {mustChange && <p className={s.note}>{t.temporaryPassword}</p>}
@@ -256,6 +228,8 @@ export function AccountView({ locale, settings, initialCart }: Common) {
             </div>
           </div>
         )}
+        {!loading && !mustChange && <div id="history"><BuyerHistory locale={locale} /></div>}
+        {!loading && <BuyerHelp locale={locale} settings={settings} />}
       </section>
     </ShopShell>
   );

@@ -2,6 +2,7 @@
 
 import { useEffect, useSyncExternalStore } from "react";
 import { dictionary, type Locale } from "../lib/i18n";
+import { buyerOrderStatus } from "../lib/buyer-status";
 import { ensureVisitor } from "../lib/visitor-client";
 import { type Cart, type ShopSettings, type Order } from "./shop-types";
 
@@ -139,10 +140,5 @@ export function cartChanged() {
 }
 
 export function statusLabel(order: Order, locale: Locale) {
-  const t = dictionary(locale);
-  if (order.paymentStatus === "paid") return t.paid;
-  if (["canceled", "cancelled", "failed"].includes(order.status))
-    return t.canceled;
-  if (["pending", "created"].includes(order.status)) return t.awaitingPayment;
-  return t.processing;
+  return buyerOrderStatus(order, locale);
 }

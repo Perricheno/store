@@ -3169,3 +3169,8 @@
     transform: none;
   }
 }
+
+.detailBrand > button { margin-left:auto; }
+@media (max-width: 767px) {
+  .detailActions > .primaryButton { display:none; }
+}

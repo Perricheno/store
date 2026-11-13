@@ -30,6 +30,7 @@ import {
 } from "./shop-types";
 import { localized, request, post } from "./shop-client";
 import { ProductMedia } from "./shop-media";
+import { BuyerHistory } from "./shop-buyer-history";
 import { catalogCopy } from "./shop-copy";
 import { ShopShell } from "./shop-shell";
 import {
@@ -406,6 +407,7 @@ export function Storefront({
         );
         setFavoriteIds(data.productIds || data.products.map((p) => p.id));
         setFavorites(data.products);
+        window.dispatchEvent(new Event("urbanmag:favorites"));
       } catch {
         setError(true);
       } finally {
@@ -634,6 +636,7 @@ export function Storefront({
             </div>
           )}
         </section>
+        {!favoritesOnly && <BuyerHistory locale={locale} controls={false} />}
         <dialog
           className={s.dialog}
           ref={dialog}

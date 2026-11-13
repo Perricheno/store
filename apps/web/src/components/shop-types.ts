@@ -52,6 +52,7 @@ export type Order = {
   total: number;
   paymentStatus: string;
   paymentMethod?: "apipay" | "wallet";
+  lines?: import("@urbanmag/core").OrderLine[];
   isDemo?: boolean;
   simulationAllowed?: boolean;
   createdAt?: string;
