@@ -1,14 +1,76 @@
-@import '@fontsource-variable/inter';
-
-:root { --red:#e60012; --black:#000; --white:#fff; color-scheme:light; }
-* { box-sizing:border-box; }
-html { margin:0; scroll-behavior:smooth; }
-body { margin:0; background:var(--white); color:var(--black); font-family:'Inter Variable',Inter,Arial,sans-serif; -webkit-font-smoothing:antialiased; }
-button,input,select,textarea { font:inherit; }
-button,a,input,select,textarea { -webkit-tap-highlight-color:transparent; }
-a { color:inherit; }
-button { cursor:pointer; }
-button:disabled { cursor:not-allowed; }
-button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible { outline:2px solid var(--red); outline-offset:4px; }
-::selection { color:var(--white); background:var(--red); }
-@media(prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto!important; animation-duration:.01ms!important; animation-iteration-count:1!important; transition-duration:.01ms!important; } }
+:root {
+  --red: #e60012;
+  --black: #000;
+  --white: #fff;
+  color-scheme: light;
+}
+* {
+  box-sizing: border-box;
+}
+html {
+  margin: 0;
+  scroll-behavior: smooth;
+}
+body {
+  margin: 0;
+  background: var(--white);
+  color: var(--black);
+  font-family: var(--font-inter), "Inter Variable", Inter, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+a {
+  color: inherit;
+}
+button {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--red);
+  outline-offset: 4px;
+}
+::selection {
+  color: var(--white);
+  background: var(--red);
+}
+.skeleton-icon {
+  animation: silhouette-pulse 1.8s ease-in-out infinite;
+}
+@keyframes silhouette-pulse {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

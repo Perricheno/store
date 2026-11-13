@@ -1,3 +1,76 @@
-export default function Loading() {
-  return <main aria-label="Загрузка" style={{padding:'32px clamp(20px,5vw,80px)',maxWidth:1600,margin:'auto'}}><header style={{fontWeight:900,fontSize:28,letterSpacing:'-2px',height:80}}>URBAN<span style={{color:'#e60012'}}>MAG</span></header><div style={{height:76,fontSize:48,fontWeight:750,letterSpacing:'-3px'}}>Urbanmag<span style={{color:'#e60012'}}>.</span></div><div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:16}}>{Array.from({length:4},(_,i)=><div key={i} style={{border:'1px solid #00000018',borderRadius:24,aspectRatio:'4/5',display:'grid',placeItems:'center'}}><svg width="96" height="96" viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="4" strokeLinejoin="round" aria-hidden="true"><path d="M32 18 12 35l13 18 9-7v38h32V46l9 7 13-18-20-17-10 9H42Z"/><animate attributeName="opacity" values=".2;.55;.2" dur="1.8s" repeatCount="indefinite"/></svg></div>)}</div></main>;
+import { headers } from "next/headers";
+import { dictionary } from "@/lib/i18n";
+import { isLocale } from "@/lib/config";
+import { TShirt } from "@phosphor-icons/react/ssr";
+import s from "@/components/shop.module.css";
+
+export default async function Loading() {
+  const language = (await headers()).get("x-urbanmag-locale") || "ru";
+  const t = dictionary(isLocale(language) ? language : "ru");
+  return (
+    <div className={s.shop} aria-busy="true" aria-label={t.loading}>
+      <header className={s.header}>
+        <div className={s.headerInner}>
+          <div className={s.logo}>
+            <span>
+              URBAN<span className={s.logoSlash}>/</span>
+            </span>
+            <span>
+              MAG<span className={s.logoDot}>●</span>
+            </span>
+          </div>
+        </div>
+      </header>
+      <main className={s.main}>
+        <section className={s.catalog}>
+          <div className={s.catalogTop}>
+            <div>
+              <div className={s.catalogTitle}>
+                …
+              </div>
+            </div>
+          </div>
+          <div className={s.genderTabs} aria-hidden="true">
+            <button disabled>{t.all}</button>
+            <button disabled>{t.men}</button>
+            <button disabled>{t.women}</button>
+          </div>
+          <div className={s.categoryRow} aria-hidden="true">
+            <div className={s.categoryScroll}>
+              {[t.all, t.tShirts, t.hoodies, t.outerwear].map((label) => (
+                <button disabled key={label}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className={s.catalogUtilities} aria-hidden="true">
+            <div className={s.catalogSearch} style={{ minHeight: 44 }} />
+            <span className={s.count}>…</span>
+            <div className={s.sort}>{t.newest}</div>
+          </div>
+          <div className={s.productGrid}>
+            {Array.from({ length: 8 }, (_, i) => (
+              <div key={i}>
+                <div className={s.cardImage}>
+                  <div
+                    className={s.productMedia}
+                    style={{ display: "grid", placeItems: "center" }}
+                  >
+                    <TShirt
+                      className="skeleton-icon"
+                      size="48%"
+                      weight="bold"
+                      aria-hidden="true"
+                    />
+                  </div>
+                </div>
+                <div style={{ height: 76 }} />
+              </div>
+            ))}
+          </div>
+        </section>
+      </main>
+    </div>
+  );
 }

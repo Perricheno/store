@@ -6,7 +6,10 @@ const config: NextConfig = {
   outputFileTracingRoot: path.join(import.meta.dirname, '../..'),
   transpilePackages: ['@urbanmag/core'],
   poweredByHeader: false,
-  experimental: { cpus: 1, optimizePackageImports: ['@phosphor-icons/react'] },
+  devIndicators: false,
+  allowedDevOrigins: ['dev-u.perricheno.com', 'staff-dev-u.perricheno.com'],
+  // The optional HMR debug stream stalls hydration through the tunnel proxy.
+  experimental: { cpus: 1, optimizePackageImports: ['@phosphor-icons/react'], reactDebugChannel: false },
   serverExternalPackages: ['@electric-sql/pglite', '@node-rs/argon2', 'postgres'],
   images: { formats: ['image/avif', 'image/webp'], minimumCacheTTL: 3600 },
   async headers() {
