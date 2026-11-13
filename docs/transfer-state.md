@@ -1,8 +1,19 @@
 # Перенос разработки на сервер
 
-Состояние на 14 ноября 2026 (Asia/Almaty). Разработка продолжена на новом сервере в `/root/market/store`, ветка `feature/integrated-review`. Ноутбук с прежней средой недоступен; пользователь выбрал чистую dev-среду. Версия v0.3.0 подготовлена в dev для пользовательского ревью; production не развернут.
+Состояние на 14 ноября 2026 (Asia/Almaty). Разработка продолжена на новом сервере в `/root/market/store`, ветка `feature/integrated-review`. Ноутбук с прежней средой недоступен; пользователь выбрал чистую dev-среду. По прямому поручению пользователя v0.4.0 выпущена в dev и production.
 
-## Кандидат v0.4.0
+## Текущий выпуск v0.4.0
+
+- Исходный коммит обоих тегов: `316aed50f5bf02ad519ec883dfd2c5f124e71fa0`; [полный CI прошёл](https://github.com/Perricheno/store/actions/runs/43515278947), 83 теста и 66 HTTPS E2E, отдельная PostgreSQL job.
+- [dev/v0.4.0](https://github.com/Perricheno/store/releases/tag/dev/v0.4.0) — prerelease, [prod/v0.4.0](https://github.com/Perricheno/store/releases/tag/prod/v0.4.0) — production release с отдельным полным манифестом.
+- `urbanmag:dev-316aed50f5bf` и `urbanmag:prod-316aed50f5bf` — один образ `sha256:4081c2d5b15d687d4b76bc16dfef1de8f1ea45b0c8ccc5ab566d9afc804ba297` с правильным OCI revision; повторной сборки при продвижении не было. Предыдущие dev-образы сохранены.
+- Web healthy и worker запущен в обоих окружениях, UID 1000, перезапусков нет. Миграции 1–6, по одному owner; тома PostgreSQL/uploads и private/frontend сети разные.
+- Публичные HTTPS-магазин и staff проверены на трёх языках и 360/1440 px; корзина/размер/фильтры/иконки/noindex и изоляция зон работают. Production checkout вернул 503 `checkout_unavailable`, начальный owner требует смены пароля; проверочная сессия завершена и корзина очищена.
+- В Nginx исправлено перенаправление RSC-заголовков в служебный auth_request. `scripts/check-edge-navigation.mjs` на обоих публичных магазинах подтвердил четыре перехода с одним документом, сохранённые DOM и шрифт. Systemd cloudflared не менялся; edge по-прежнему слушает `127.0.0.1:18080`.
+- Production: `APIPAY_MODE=production`, `SEO_INDEXING_ENABLED=false`, `WALLET_PRODUCTION_ENABLED=false`; ApiPay и SMTP ещё не подключены. Доступы хранятся только в `.secrets/server-access-prod.txt` и `.env.prod` с правами 0600. Dev-пароли не менялись, dev-владелец сохранён.
+- `/root/market/backups/prod-initial-v0.4.0`: фактически восстановлен через `pg_restore --exit-on-error --no-owner` в отдельный PostgreSQL 18 без сети и портов. Проверены миграции 1–6, 500 товаров, один owner и читаемый архив uploads. Каталог 0700, файлы 0600; временный контейнер и анонимный том удалены, live-среда не менялась. Внешнее хранилище и расписание бэкапов не настраивались.
+
+## Подготовка v0.4.0
 
 Пользователь поручил выпустить обновление в production. Проверены TypeScript, 83 теста, production-сборка и все 66 HTTPS E2E без retry; шесть новых cart-сценариев отдельно прошли на PostgreSQL 18. Добавлена миграция 6 `cart_pending_sizes`, сохраняющая прежние корзины. Перед обновлением dev создана резервная копия `/root/market/backups/dev-before-v0.4.0`; она не заменяет уже проверенное восстановление начальной копии ниже.
 
@@ -51,7 +62,7 @@ Git не содержит секретов, базы, фотографий, за
 
 Проверка GitHub CI коммита `9c56929` выявила отдельную гонку начальной загрузки аналитики: второй запрос после общей загрузки кабинета убирал ошибку и кнопку «Повторить». Причина воспроизведена управляемой задержкой ответа; начальная загрузка отделена от явного обновления, регрессионный E2E проверяет оба действия. После исправления прошли TypeScript, production-сборка, 8 из 8 последовательных целевых запусков с `CI=true` без retry или sleep и весь набор 52 HTTPS E2E с `CI=true` за 1,2 минуты. Текущий образ развертывания задается приватным `IMAGE_TAG` в `.env.dev`; исходный коммит хранится в OCI label `org.opencontainers.image.revision`.
 
-## Готовый dev для ревью
+## Предыдущий dev v0.3.0
 
 Опубликован отдельный prerelease [dev/v0.3.0](https://github.com/Perricheno/store/releases/tag/dev/v0.3.0), исходный коммит `98aa3a1ee9079cacdb74516cabfd75455bd59380`. GitHub CI этого коммита прошел для обеих веток; [проверка dev](https://github.com/Perricheno/store/actions/runs/43507062643) включает PostgreSQL, TypeScript, тесты, сборку и HTTPS E2E.
 
