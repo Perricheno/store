@@ -192,6 +192,75 @@ test("funded buyer balance: confirmed account, mock invoice, wallet checkout and
   await page.unroute("**/api/wallet");
   await page.getByRole("button", { name: "Повторить", exact: true }).click();
   await expect(page.getByTestId("wallet-balance")).toBeVisible();
+  // Staff refunds return the original debit once; ApiPay orders never offer this action.
+  const staffLogin = async (password: string) =>
+    api.post("/api/staff/auth/login", {
+      headers: { Origin: origin },
+      data: { email: "owner@urbanmag.test", password },
+    });
+  let staffSession = await staffLogin("Owner-permanent-password-2026!");
+  if (staffSession.status() === 401) {
+    staffSession = await staffLogin("E2e-owner-password-2026!");
+    expect(staffSession.ok()).toBeTruthy();
+    expect(
+      (
+        await api.patch("/api/staff/auth/password", {
+          headers: { Origin: origin },
+          data: {
+            currentPassword: "E2e-owner-password-2026!",
+            newPassword: "Owner-permanent-password-2026!",
+          },
+        })
+      ).ok(),
+    ).toBeTruthy();
+  }
+  expect(staffSession.ok()).toBeTruthy();
+  await page.goto("/staff");
+  await page.getByRole("button", { name: "Заказы", exact: true }).click();
+  const bootstrapOrder = await bootstrap.json();
+  await page
+    .getByRole("row")
+    .filter({ hasText: bootstrapOrder.id.slice(0, 8).toUpperCase() })
+    .getByRole("button", { name: "Заказ", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Вернуть на баланс", exact: true }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Закрыть", exact: true })
+    .click();
+  const walletRow = page
+    .getByRole("row")
+    .filter({ hasText: paid.id.slice(0, 8).toUpperCase() });
+  await walletRow.getByRole("button", { name: "Заказ", exact: true }).click();
+  const refunded = page.waitForResponse(
+    (result) =>
+      result.url().endsWith(`/api/staff/orders/${paid.id}/wallet-refund`) &&
+      result.request().method() === "POST",
+  );
+  await page
+    .getByRole("button", { name: "Вернуть на баланс", exact: true })
+    .click();
+  expect((await refunded).ok()).toBeTruthy();
+  await expect(walletRow).toContainText("Возвращён");
+  await walletRow.getByRole("button", { name: "Заказ", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Вернуть на баланс", exact: true }),
+  ).toHaveCount(0);
+  const duplicate = await api.post(
+    `/api/staff/orders/${paid.id}/wallet-refund`,
+    { headers: { Origin: origin } },
+  );
+  expect(await duplicate.json()).toMatchObject({ duplicate: true });
+  const wallet = await (await api.get("/api/wallet")).json();
+  expect(wallet.balance).toBe(price * 2);
+  expect(
+    wallet.entries.filter(
+      (entry: any) =>
+        entry.kind === "order_refund" && entry.orderId === paid.id,
+    ),
+  ).toHaveLength(1);
 });
 
 test("wallet guest route is guarded and three-language access copy fits mobile", async ({

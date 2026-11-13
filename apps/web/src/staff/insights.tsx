@@ -4,76 +4,586 @@ import type { StaffInsights } from "@urbanmag/core";
 import s from "./insights.module.css";
 
 const copy = {
- ru: {
-  summary: "Сводка", analytics: "Аналитика", period: "Период", days: "дней", loading: "Загружаем показатели…", failed: "Не удалось загрузить показатели", retry: "Повторить", revenue: "Выручка завершённых заказов", completed: "Завершённые заказы", average: "Средний завершённый заказ", noCompleted: "Нет завершённых заказов", pipeline: "Оплачено, ожидает выполнения", current: "Сейчас", periodHint: "Продажи за выбранный период по дате завершения. Только реальные товары, подтверждённая оплата production и полная сумма. Данные по всей истории базы; часовой пояс Asia/Almaty.", pipelineHint: "Оплаченные, обрабатываемые и готовые заказы с подтверждённой оплатой. Это ещё не выручка завершённых заказов.", catalog: "Каталог и остатки", real: "Реальные товары", published: "Опубликованы", demo: "Демотовары", available: "Доступно единиц", reserved: "Зарезервировано", low: "Варианты с остатком 1–3", out: "Варианты без остатка", stockScope: "Остатки опубликованных реальных товаров, суммарно по филиалам. До 20 вариантов с остатком не более 3.", alerts: "Проверьте остатки", noAlerts: "Нет вариантов с низким остатком", product: "Товар", variant: "Вариант", orders: "Созданные заказы", states: "Статусы созданных заказов", statesHint: "Текущие статусы заказов, созданных за период; включает тестовые и неоплаченные заказы.", empty: "За выбранный период данных нет", daily: "Выручка по дням", dailyTable: "Данные по дням", date: "Дата", top: "Товары по выручке", units: "Продано единиц", amount: "Выручка", categories: "Продажи по категориям", unknown: "Категория не сохранена", categoryHint: "Категория из снимка заказа. Старые строки без категории учитываются отдельно; текущий каталог не подменяет историю.", quality: "Качество данных", qualityHint: "Счётчики по всей истории, кроме строк без категории за выбранный период. Группы пересекаются; их нельзя складывать. Демотовары, sandbox/mock, неподтверждённая оплата, частичные возвраты и завершения без даты исключены из выручки. Это валовая сумма заказов, не чистый доход.", allOrders: "Всего заказов в истории", verified: "Реальные с подтверждённой оплатой", demoOrders: "Тестовые или смешанные заказы", sandbox: "Sandbox / mock", unverified: "Без подтверждённой полной оплаты", missingDate: "Завершены без даты завершения", missingCategory: "Проданные строки без категории", partialRefund: "Частичные возвраты", productsLink: "Перейти к товарам", ordersLink: "Перейти к заказам", generated: "Обновлено", count: "заказов", awaiting_payment: "Ожидает оплаты", paid: "Оплачен", processing: "Обрабатывается", ready: "Готов к выдаче", completedStatus: "Завершён", cancelled: "Отменён", expired: "Истёк", refunded: "Возвращён", manual_review: "Ручная проверка", refund_required: "Требуется возврат", outerwear: "Верхняя одежда", sneakers: "Кроссовки", hoodies: "Худи", "t-shirts": "Футболки", shirts: "Рубашки", trousers: "Брюки", accessories: "Аксессуары",
- },
- kk: {
-  summary: "Шолу", analytics: "Талдау", period: "Кезең", days: "күн", loading: "Көрсеткіштер жүктелуде…", failed: "Көрсеткіштерді жүктеу мүмкін болмады", retry: "Қайталау", revenue: "Аяқталған тапсырыстар түсімі", completed: "Аяқталған тапсырыстар", average: "Аяқталған тапсырыстың орташа сомасы", noCompleted: "Аяқталған тапсырыстар жоқ", pipeline: "Төленген, орындалуды күтуде", current: "Қазір", periodHint: "Таңдалған кезеңдегі сатылым аяқталған күні бойынша есептеледі. Тек нақты тауарлар, расталған production төлемі және толық сома. Базаның бүкіл тарихы қолданылады; уақыт белдеуі Asia/Almaty.", pipelineHint: "Төлемі расталған төленген, өңделетін және дайын тапсырыстар. Бұл аяқталған тапсырыстар түсімі емес.", catalog: "Каталог және қалдықтар", real: "Нақты тауарлар", published: "Жарияланған", demo: "Демо тауарлар", available: "Қолжетімді дана", reserved: "Брондалған", low: "Қалдығы 1–3 нұсқалар", out: "Қалдығы жоқ нұсқалар", stockScope: "Жарияланған нақты тауарлардың барлық филиалдар бойынша қалдығы. Қалдығы 3-тен аспайтын 20 нұсқаға дейін.", alerts: "Қалдықтарды тексеріңіз", noAlerts: "Қалдығы аз нұсқалар жоқ", product: "Тауар", variant: "Нұсқа", orders: "Құрылған тапсырыстар", states: "Құрылған тапсырыстар күйлері", statesHint: "Кезеңде құрылған тапсырыстардың ағымдағы күйлері; тестілік және төленбеген тапсырыстарды қамтиды.", empty: "Таңдалған кезеңде деректер жоқ", daily: "Күндер бойынша түсім", dailyTable: "Күндік деректер", date: "Күні", top: "Түсім бойынша тауарлар", units: "Сатылған дана", amount: "Түсім", categories: "Санаттар бойынша сатылым", unknown: "Санат сақталмаған", categoryHint: "Санат тапсырыс көшірмесінен алынады. Санаты жоқ ескі жолдар бөлек есептеледі; ағымдағы каталог тарихты алмастырмайды.", quality: "Деректер сапасы", qualityHint: "Таңдалған кезеңдегі санатсыз жолдардан басқа сандар бүкіл тарихты қамтиды. Топтар қабаттасады; оларды қосуға болмайды. Демо тауарлар, sandbox/mock, расталмаған төлем, ішінара қайтарым және аяқталу күні жоқ тапсырыстар түсімнен алынып тасталады. Бұл таза табыс емес, тапсырыстардың жалпы сомасы.", allOrders: "Тарихтағы барлық тапсырыстар", verified: "Төлемі расталған нақты тапсырыстар", demoOrders: "Тестілік немесе аралас тапсырыстар", sandbox: "Sandbox / mock", unverified: "Толық расталған төлемсіз", missingDate: "Аяқталу күні жоқ аяқталған тапсырыстар", missingCategory: "Санаты жоқ сатылған жолдар", partialRefund: "Ішінара қайтарымдар", productsLink: "Тауарларға өту", ordersLink: "Тапсырыстарға өту", generated: "Жаңартылған", count: "тапсырыс", awaiting_payment: "Төлем күтілуде", paid: "Төленген", processing: "Өңделуде", ready: "Алуға дайын", completedStatus: "Аяқталған", cancelled: "Бас тартылған", expired: "Мерзімі өткен", refunded: "Қайтарылған", manual_review: "Қолмен тексеру", refund_required: "Қайтару қажет", outerwear: "Сыртқы киім", sneakers: "Кроссовкалар", hoodies: "Худи", "t-shirts": "Футболкалар", shirts: "Жейделер", trousers: "Шалбарлар", accessories: "Аксессуарлар",
- },
- en: {
-  summary: "Summary", analytics: "Analytics", period: "Period", days: "days", loading: "Loading insights…", failed: "Could not load insights", retry: "Retry", revenue: "Completed order revenue", completed: "Completed orders", average: "Average completed order", noCompleted: "No completed orders", pipeline: "Paid, awaiting fulfilment", current: "Current", periodHint: "Sales in the selected period by completion date. Real goods, verified production payment and full amount only. Uses the complete database history; timezone Asia/Almaty.", pipelineHint: "Verified paid, processing and ready orders. These are not yet completed order revenue.", catalog: "Catalog and inventory", real: "Real products", published: "Published", demo: "Demo products", available: "Available units", reserved: "Reserved", low: "Variants with 1–3 units", out: "Out of stock variants", stockScope: "Published real goods, stock summed across branches. Up to 20 variants with no more than 3 units available.", alerts: "Check stock", noAlerts: "No low stock variants", product: "Product", variant: "Variant", orders: "Orders created", states: "Created order statuses", statesHint: "Current statuses of orders created in the period; includes test and unpaid orders.", empty: "No data for the selected period", daily: "Daily revenue", dailyTable: "Daily data", date: "Date", top: "Products by revenue", units: "Units sold", amount: "Revenue", categories: "Sales by category", unknown: "Category not recorded", categoryHint: "Category from the order snapshot. Older lines without a category are counted separately; today's catalog does not rewrite history.", quality: "Data quality", qualityHint: "All history, except uncategorised sold lines in the selected period. Groups overlap and must not be added together. Demo goods, sandbox/mock, unverified payments, partial refunds and completions without timestamps are excluded from revenue. This is gross order value, not net income.", allOrders: "All historical orders", verified: "Verified real orders", demoOrders: "Test or mixed orders", sandbox: "Sandbox / mock", unverified: "Without verified full payment", missingDate: "Completed without completion date", missingCategory: "Sold lines without category", partialRefund: "Partial refunds", productsLink: "Go to products", ordersLink: "Go to orders", generated: "Updated", count: "orders", awaiting_payment: "Awaiting payment", paid: "Paid", processing: "Processing", ready: "Ready for collection", completedStatus: "Completed", cancelled: "Cancelled", expired: "Expired", refunded: "Refunded", manual_review: "Manual review", refund_required: "Refund required", outerwear: "Outerwear", sneakers: "Sneakers", hoodies: "Hoodies", "t-shirts": "T-shirts", shirts: "Shirts", trousers: "Trousers", accessories: "Accessories",
- },
+  ru: {
+    summary: "Сводка",
+    analytics: "Аналитика",
+    period: "Период",
+    days: "дней",
+    loading: "Загружаем показатели…",
+    failed: "Не удалось загрузить показатели",
+    retry: "Повторить",
+    revenue: "Выручка завершённых заказов",
+    completed: "Завершённые заказы",
+    average: "Средний завершённый заказ",
+    noCompleted: "Нет завершённых заказов",
+    pipeline: "Оплачено, ожидает выполнения",
+    current: "Сейчас",
+    periodHint:
+      "Продажи за выбранный период по дате завершения. Только реальные товары, подтверждённая оплата production и полная сумма. Данные по всей истории базы; часовой пояс Asia/Almaty.",
+    pipelineHint:
+      "Оплаченные, обрабатываемые и готовые заказы с подтверждённой оплатой. Это ещё не выручка завершённых заказов.",
+    catalog: "Каталог и остатки",
+    real: "Реальные товары",
+    published: "Опубликованы",
+    demo: "Демотовары",
+    available: "Доступно единиц",
+    reserved: "Зарезервировано",
+    low: "Варианты с остатком 1–3",
+    out: "Варианты без остатка",
+    stockScope:
+      "Остатки опубликованных реальных товаров, суммарно по филиалам. До 20 вариантов с остатком не более 3.",
+    alerts: "Проверьте остатки",
+    noAlerts: "Нет вариантов с низким остатком",
+    product: "Товар",
+    variant: "Вариант",
+    orders: "Созданные заказы",
+    states: "Статусы созданных заказов",
+    statesHint:
+      "Текущие статусы заказов, созданных за период; включает тестовые и неоплаченные заказы.",
+    empty: "За выбранный период данных нет",
+    daily: "Выручка по дням",
+    dailyTable: "Данные по дням",
+    date: "Дата",
+    top: "Товары по выручке",
+    units: "Продано единиц",
+    amount: "Выручка",
+    categories: "Продажи по категориям",
+    unknown: "Категория не сохранена",
+    categoryHint:
+      "Категория из снимка заказа. Старые строки без категории учитываются отдельно; текущий каталог не подменяет историю.",
+    quality: "Качество данных",
+    qualityHint:
+      "Счётчики по всей истории, кроме строк без категории за выбранный период. Группы пересекаются; их нельзя складывать. Демотовары, sandbox/mock, неподтверждённая оплата, частичные возвраты и завершения без даты исключены из выручки. Это валовая сумма заказов, не чистый доход.",
+    allOrders: "Всего заказов в истории",
+    verified: "Реальные с подтверждённой оплатой",
+    demoOrders: "Тестовые или смешанные заказы",
+    sandbox: "Sandbox / mock",
+    unverified: "Без подтверждённой полной оплаты",
+    missingDate: "Завершены без даты завершения",
+    missingCategory: "Проданные строки без категории",
+    partialRefund: "Частичные возвраты",
+    productsLink: "Перейти к товарам",
+    ordersLink: "Перейти к заказам",
+    generated: "Обновлено",
+    count: "заказов",
+    awaiting_payment: "Ожидает оплаты",
+    paid: "Оплачен",
+    processing: "Обрабатывается",
+    ready: "Готов к выдаче",
+    completedStatus: "Завершён",
+    cancelled: "Отменён",
+    expired: "Истёк",
+    refunded: "Возвращён",
+    manual_review: "Ручная проверка",
+    refund_required: "Требуется возврат",
+    outerwear: "Верхняя одежда",
+    sneakers: "Кроссовки",
+    hoodies: "Худи",
+    "t-shirts": "Футболки",
+    shirts: "Рубашки",
+    trousers: "Брюки",
+    accessories: "Аксессуары",
+  },
+  kk: {
+    summary: "Шолу",
+    analytics: "Талдау",
+    period: "Кезең",
+    days: "күн",
+    loading: "Көрсеткіштер жүктелуде…",
+    failed: "Көрсеткіштерді жүктеу мүмкін болмады",
+    retry: "Қайталау",
+    revenue: "Аяқталған тапсырыстар түсімі",
+    completed: "Аяқталған тапсырыстар",
+    average: "Аяқталған тапсырыстың орташа сомасы",
+    noCompleted: "Аяқталған тапсырыстар жоқ",
+    pipeline: "Төленген, орындалуды күтуде",
+    current: "Қазір",
+    periodHint:
+      "Таңдалған кезеңдегі сатылым аяқталған күні бойынша есептеледі. Тек нақты тауарлар, расталған production төлемі және толық сома. Базаның бүкіл тарихы қолданылады; уақыт белдеуі Asia/Almaty.",
+    pipelineHint:
+      "Төлемі расталған төленген, өңделетін және дайын тапсырыстар. Бұл аяқталған тапсырыстар түсімі емес.",
+    catalog: "Каталог және қалдықтар",
+    real: "Нақты тауарлар",
+    published: "Жарияланған",
+    demo: "Демо тауарлар",
+    available: "Қолжетімді дана",
+    reserved: "Брондалған",
+    low: "Қалдығы 1–3 нұсқалар",
+    out: "Қалдығы жоқ нұсқалар",
+    stockScope:
+      "Жарияланған нақты тауарлардың барлық филиалдар бойынша қалдығы. Қалдығы 3-тен аспайтын 20 нұсқаға дейін.",
+    alerts: "Қалдықтарды тексеріңіз",
+    noAlerts: "Қалдығы аз нұсқалар жоқ",
+    product: "Тауар",
+    variant: "Нұсқа",
+    orders: "Құрылған тапсырыстар",
+    states: "Құрылған тапсырыстар күйлері",
+    statesHint:
+      "Кезеңде құрылған тапсырыстардың ағымдағы күйлері; тестілік және төленбеген тапсырыстарды қамтиды.",
+    empty: "Таңдалған кезеңде деректер жоқ",
+    daily: "Күндер бойынша түсім",
+    dailyTable: "Күндік деректер",
+    date: "Күні",
+    top: "Түсім бойынша тауарлар",
+    units: "Сатылған дана",
+    amount: "Түсім",
+    categories: "Санаттар бойынша сатылым",
+    unknown: "Санат сақталмаған",
+    categoryHint:
+      "Санат тапсырыс көшірмесінен алынады. Санаты жоқ ескі жолдар бөлек есептеледі; ағымдағы каталог тарихты алмастырмайды.",
+    quality: "Деректер сапасы",
+    qualityHint:
+      "Таңдалған кезеңдегі санатсыз жолдардан басқа сандар бүкіл тарихты қамтиды. Топтар қабаттасады; оларды қосуға болмайды. Демо тауарлар, sandbox/mock, расталмаған төлем, ішінара қайтарым және аяқталу күні жоқ тапсырыстар түсімнен алынып тасталады. Бұл таза табыс емес, тапсырыстардың жалпы сомасы.",
+    allOrders: "Тарихтағы барлық тапсырыстар",
+    verified: "Төлемі расталған нақты тапсырыстар",
+    demoOrders: "Тестілік немесе аралас тапсырыстар",
+    sandbox: "Sandbox / mock",
+    unverified: "Толық расталған төлемсіз",
+    missingDate: "Аяқталу күні жоқ аяқталған тапсырыстар",
+    missingCategory: "Санаты жоқ сатылған жолдар",
+    partialRefund: "Ішінара қайтарымдар",
+    productsLink: "Тауарларға өту",
+    ordersLink: "Тапсырыстарға өту",
+    generated: "Жаңартылған",
+    count: "тапсырыс",
+    awaiting_payment: "Төлем күтілуде",
+    paid: "Төленген",
+    processing: "Өңделуде",
+    ready: "Алуға дайын",
+    completedStatus: "Аяқталған",
+    cancelled: "Бас тартылған",
+    expired: "Мерзімі өткен",
+    refunded: "Қайтарылған",
+    manual_review: "Қолмен тексеру",
+    refund_required: "Қайтару қажет",
+    outerwear: "Сыртқы киім",
+    sneakers: "Кроссовкалар",
+    hoodies: "Худи",
+    "t-shirts": "Футболкалар",
+    shirts: "Жейделер",
+    trousers: "Шалбарлар",
+    accessories: "Аксессуарлар",
+  },
+  en: {
+    summary: "Summary",
+    analytics: "Analytics",
+    period: "Period",
+    days: "days",
+    loading: "Loading insights…",
+    failed: "Could not load insights",
+    retry: "Retry",
+    revenue: "Completed order revenue",
+    completed: "Completed orders",
+    average: "Average completed order",
+    noCompleted: "No completed orders",
+    pipeline: "Paid, awaiting fulfilment",
+    current: "Current",
+    periodHint:
+      "Sales in the selected period by completion date. Real goods, verified production payment and full amount only. Uses the complete database history; timezone Asia/Almaty.",
+    pipelineHint:
+      "Verified paid, processing and ready orders. These are not yet completed order revenue.",
+    catalog: "Catalog and inventory",
+    real: "Real products",
+    published: "Published",
+    demo: "Demo products",
+    available: "Available units",
+    reserved: "Reserved",
+    low: "Variants with 1–3 units",
+    out: "Out of stock variants",
+    stockScope:
+      "Published real goods, stock summed across branches. Up to 20 variants with no more than 3 units available.",
+    alerts: "Check stock",
+    noAlerts: "No low stock variants",
+    product: "Product",
+    variant: "Variant",
+    orders: "Orders created",
+    states: "Created order statuses",
+    statesHint:
+      "Current statuses of orders created in the period; includes test and unpaid orders.",
+    empty: "No data for the selected period",
+    daily: "Daily revenue",
+    dailyTable: "Daily data",
+    date: "Date",
+    top: "Products by revenue",
+    units: "Units sold",
+    amount: "Revenue",
+    categories: "Sales by category",
+    unknown: "Category not recorded",
+    categoryHint:
+      "Category from the order snapshot. Older lines without a category are counted separately; today's catalog does not rewrite history.",
+    quality: "Data quality",
+    qualityHint:
+      "All history, except uncategorised sold lines in the selected period. Groups overlap and must not be added together. Demo goods, sandbox/mock, unverified payments, partial refunds and completions without timestamps are excluded from revenue. This is gross order value, not net income.",
+    allOrders: "All historical orders",
+    verified: "Verified real orders",
+    demoOrders: "Test or mixed orders",
+    sandbox: "Sandbox / mock",
+    unverified: "Without verified full payment",
+    missingDate: "Completed without completion date",
+    missingCategory: "Sold lines without category",
+    partialRefund: "Partial refunds",
+    productsLink: "Go to products",
+    ordersLink: "Go to orders",
+    generated: "Updated",
+    count: "orders",
+    awaiting_payment: "Awaiting payment",
+    paid: "Paid",
+    processing: "Processing",
+    ready: "Ready for collection",
+    completedStatus: "Completed",
+    cancelled: "Cancelled",
+    expired: "Expired",
+    refunded: "Refunded",
+    manual_review: "Manual review",
+    refund_required: "Refund required",
+    outerwear: "Outerwear",
+    sneakers: "Sneakers",
+    hoodies: "Hoodies",
+    "t-shirts": "T-shirts",
+    shirts: "Shirts",
+    trousers: "Trousers",
+    accessories: "Accessories",
+  },
 };
 type Lang = keyof typeof copy;
 const numberLocale = { ru: "ru-KZ", kk: "kk-KZ", en: "en-KZ" };
 
-export function StaffInsightsPanel({ lang, mode, revision, onNavigate }: { lang: Lang; mode: "summary" | "analytics"; revision: number; onNavigate: (tab: string) => void }) {
- const t = copy[lang];
- const [days, setDays] = useState<7 | 30 | 90 | 365>(30);
- const [data, setData] = useState<StaffInsights | null>(null);
- const [loading, setLoading] = useState(true);
- const [failed, setFailed] = useState(false);
- const [retry, setRetry] = useState(0);
- const chartId = useId();
- useEffect(() => {
-  const controller = new AbortController(); setLoading(true); setFailed(false);
-  fetch(`/api/staff/insights?days=${days}`, { signal: controller.signal }).then(async (response) => {
-   if (!response.ok) throw new Error();
-   const result: StaffInsights = await response.json();
-   if (!result.period || !Array.isArray(result.daily)) throw new Error();
-   if (!controller.signal.aborted) setData(result);
-  }).catch(() => { if (!controller.signal.aborted) setFailed(true); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
-  return () => controller.abort();
- }, [days, revision, retry]);
- const n = (value: number) => new Intl.NumberFormat(numberLocale[lang]).format(value);
- const money = (value: number) => `${n(value)} ₸`;
- const date = (value: string, time = false) => new Intl.DateTimeFormat(numberLocale[lang], { timeZone: "Asia/Almaty", day: "numeric", month: "short", ...(time ? { hour: "2-digit", minute: "2-digit" } as const : {}) }).format(new Date(value));
- const card = (label: string, value: string, note?: string) => <article className={s.metric} key={label}><h3>{label}</h3><strong>{value}</strong>{note && <p>{note}</p>}</article>;
- const max = Math.max(1, ...(data?.daily.map((day) => day.completedAmount) ?? []));
- const points = data?.daily.map((day, index) => `${(index / Math.max(1, data.daily.length - 1)) * 900},${180 - (day.completedAmount / max) * 160}`).join(" ");
- return <section className={s.panel} aria-busy={loading}>
-  <div className={s.heading}><h2>{t[mode]}</h2><label>{t.period}<select value={days} onChange={(event) => setDays(Number(event.target.value) as typeof days)}>{([7,30,90,365] as const).map((value) => <option key={value} value={value}>{value} {t.days}</option>)}</select></label></div>
-  {loading && <p role="status">{t.loading}</p>}
-  {failed && <div role="alert" className={s.error}><p>{t.failed}</p><button onClick={() => setRetry((value) => value + 1)}>{t.retry}</button></div>}
-  {!loading && !failed && data && <>
-   <p className={s.hint}>{t.periodHint}</p>
-   <p className={s.hint}>{date(data.period.from)} – {date(data.period.to)} · {t.generated}: {date(data.generatedAt, true)}</p>
-   <div className={s.metrics}>
-    {card(t.revenue, money(data.revenue.completedAmount))}
-    {card(t.completed, n(data.revenue.completedOrders))}
-    {card(t.average, data.revenue.averageCompletedOrder === null ? t.noCompleted : money(data.revenue.averageCompletedOrder))}
-    {card(t.pipeline, money(data.pipeline.paidAmount), `${t.current} · ${n(data.pipeline.paidOrders)} ${t.count}`)}
-   </div>
-   <p className={s.hint}>{t.pipelineHint}</p>
-   <div className={s.quickLinks}><button onClick={() => onNavigate("products")}>{t.productsLink}</button><button onClick={() => onNavigate("orders")}>{t.ordersLink}</button></div>
-   {mode === "summary" && <section className={s.card}>
-    <h3>{t.catalog} · {t.current}</h3>
-    <dl className={s.facts}>{[[t.real,data.catalog.realProducts],[t.published,data.catalog.publishedRealProducts],[t.demo,data.catalog.demoProducts],[t.available,data.inventory.availableUnits],[t.reserved,data.inventory.reservedUnits],[t.low,data.inventory.lowVariants],[t.out,data.inventory.outVariants]].map(([label,value]) => <div key={String(label)}><dt>{label}</dt><dd>{n(Number(value))}</dd></div>)}</dl>
-    <h3>{t.alerts}</h3><p className={s.hint}>{t.stockScope}</p>
-    {!data.inventory.alerts.length ? <p>{t.noAlerts}</p> : <div className={s.tableWrap}><table><thead><tr><th>{t.product}</th><th>{t.variant}</th><th>{t.available}</th></tr></thead><tbody>{data.inventory.alerts.map((alert) => <tr key={alert.variantId}><td>{alert.names[lang]}</td><td>{alert.size} · {alert.color}</td><td>{n(alert.available)}</td></tr>)}</tbody></table></div>}
-   </section>}
-   <section className={s.card}>
-    <h3>{t.daily}</h3>
-    <svg viewBox="0 0 900 200" className={s.chart} role="img" aria-labelledby={chartId}><title id={chartId}>{t.daily}: {money(data.revenue.completedAmount)}. {date(data.period.from)} – {date(data.period.to)}</title><path d="M0 180H900" stroke="#ddd" /><polygon points={`0,180 ${points} 900,180`} fill="#e6001212" /><polyline points={points} fill="none" stroke="#e60012" strokeWidth="3" vectorEffect="non-scaling-stroke" /></svg>
-    <div className={s.chartLegend}><span>{date(data.period.from)}</span><span>{money(max === 1 && data.revenue.completedAmount === 0 ? 0 : max)}</span><span>{date(data.period.to)}</span></div>
-    <details><summary>{t.dailyTable}</summary><div className={s.tableWrap}><table><thead><tr><th>{t.date}</th><th>{t.orders}</th><th>{t.completed}</th><th>{t.amount}</th></tr></thead><tbody>{data.daily.map((day) => <tr key={day.date}><td>{date(day.date)}</td><td>{n(day.createdOrders)}</td><td>{n(day.completedOrders)}</td><td>{money(day.completedAmount)}</td></tr>)}</tbody></table></div></details>
-   </section>
-   <section className={s.card}><h3>{t.states} · {n(data.orders.created)}</h3><p className={s.hint}>{t.statesHint}</p><dl className={s.facts}>{Object.entries(data.orders.byStatus).map(([state, value]) => <div key={state}><dt>{state === "completed" ? t.completedStatus : t[state as keyof typeof t] || state}</dt><dd>{n(value)}</dd></div>)}</dl>{!data.orders.created && <p>{t.empty}</p>}</section>
-   {mode === "analytics" && <>
-    <section className={s.card}><h3>{t.top}</h3>{!data.topProducts.length ? <p>{t.empty}</p> : <div className={s.tableWrap}><table><thead><tr><th>{t.product}</th><th>{t.units}</th><th>{t.amount}</th></tr></thead><tbody>{data.topProducts.map((product) => <tr key={product.productId}><td>{product.names[lang]}</td><td>{n(product.units)}</td><td>{money(product.amount)}</td></tr>)}</tbody></table></div>}</section>
-    <section className={s.card}><h3>{t.categories}</h3><p className={s.hint}>{t.categoryHint}</p>{!data.categorySales.length ? <p>{t.empty}</p> : <div className={s.tableWrap}><table><thead><tr><th>{t.categories}</th><th>{t.units}</th><th>{t.amount}</th></tr></thead><tbody>{data.categorySales.map((category) => <tr key={category.category ?? "unknown"}><td>{category.category ? t[category.category as keyof typeof t] || category.category : t.unknown}</td><td>{n(category.units)}</td><td>{money(category.amount)}</td></tr>)}</tbody></table></div>}</section>
-   </>}
-   <details className={s.card}><summary>{t.quality}</summary><p className={s.hint}>{t.qualityHint}</p><dl className={s.facts}>{[[t.allOrders,data.quality.allOrders],[t.verified,data.quality.verifiedRealOrders],[t.demoOrders,data.quality.demoOrders],[t.sandbox,data.quality.sandboxOrders],[t.unverified,data.quality.unverifiedOrders],[t.missingDate,data.quality.completedWithoutTimestamp],[t.missingCategory,data.quality.linesWithoutCategory],[t.partialRefund,data.quality.partialRefundOrders]].map(([label,value]) => <div key={String(label)}><dt>{label}</dt><dd>{n(Number(value))}</dd></div>)}</dl></details>
-  </>}
- </section>;
+export function StaffInsightsPanel({
+  lang,
+  mode,
+  revision,
+  onNavigate,
+}: {
+  lang: Lang;
+  mode: "summary" | "analytics";
+  revision: number;
+  onNavigate: (tab: string) => void;
+}) {
+  const t = copy[lang];
+  const [days, setDays] = useState<7 | 30 | 90 | 365>(30);
+  const [data, setData] = useState<StaffInsights | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  const [retry, setRetry] = useState(0);
+  const chartId = useId();
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    setFailed(false);
+    fetch(`/api/staff/insights?days=${days}`, { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error();
+        const result: StaffInsights = await response.json();
+        if (!result.period || !Array.isArray(result.daily)) throw new Error();
+        if (!controller.signal.aborted) setData(result);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setFailed(true);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [days, revision, retry]);
+  const n = (value: number) =>
+    new Intl.NumberFormat(numberLocale[lang]).format(value);
+  const money = (value: number) => `${n(value)} ₸`;
+  const date = (value: string, time = false) =>
+    new Intl.DateTimeFormat(numberLocale[lang], {
+      timeZone: "Asia/Almaty",
+      day: "numeric",
+      month: "short",
+      ...(time ? ({ hour: "2-digit", minute: "2-digit" } as const) : {}),
+    }).format(new Date(value));
+  const card = (label: string, value: string, note?: string) => (
+    <article className={s.metric} key={label}>
+      <h3>{label}</h3>
+      <strong>{value}</strong>
+      {note && <p>{note}</p>}
+    </article>
+  );
+  const max = Math.max(
+    1,
+    ...(data?.daily.map((day) => day.completedAmount) ?? []),
+  );
+  const points = data?.daily
+    .map(
+      (day, index) =>
+        `${(index / Math.max(1, data.daily.length - 1)) * 900},${180 - (day.completedAmount / max) * 160}`,
+    )
+    .join(" ");
+  return (
+    <section className={s.panel} aria-busy={loading}>
+      <div className={s.heading}>
+        <h2>{t[mode]}</h2>
+        <label>
+          {t.period}
+          <select
+            value={days}
+            onChange={(event) =>
+              setDays(Number(event.target.value) as typeof days)
+            }
+          >
+            {([7, 30, 90, 365] as const).map((value) => (
+              <option key={value} value={value}>
+                {value} {t.days}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      {loading && <p role="status">{t.loading}</p>}
+      {failed && (
+        <div role="alert" className={s.error}>
+          <p>{t.failed}</p>
+          <button onClick={() => setRetry((value) => value + 1)}>
+            {t.retry}
+          </button>
+        </div>
+      )}
+      {!loading && !failed && data && (
+        <>
+          <p className={s.hint}>{t.periodHint}</p>
+          <p className={s.hint}>
+            {date(data.period.from)} – {date(data.period.to)} · {t.generated}:{" "}
+            {date(data.generatedAt, true)}
+          </p>
+          <div className={s.metrics}>
+            {card(t.revenue, money(data.revenue.completedAmount))}
+            {card(t.completed, n(data.revenue.completedOrders))}
+            {card(
+              t.average,
+              data.revenue.averageCompletedOrder === null
+                ? t.noCompleted
+                : money(data.revenue.averageCompletedOrder),
+            )}
+            {card(
+              t.pipeline,
+              money(data.pipeline.paidAmount),
+              `${t.current} · ${n(data.pipeline.paidOrders)} ${t.count}`,
+            )}
+          </div>
+          <p className={s.hint}>{t.pipelineHint}</p>
+          <div className={s.quickLinks}>
+            <button onClick={() => onNavigate("products")}>
+              {t.productsLink}
+            </button>
+            <button onClick={() => onNavigate("orders")}>{t.ordersLink}</button>
+          </div>
+          {mode === "summary" && (
+            <section className={s.card}>
+              <h3>
+                {t.catalog} · {t.current}
+              </h3>
+              <dl className={s.facts}>
+                {[
+                  [t.real, data.catalog.realProducts],
+                  [t.published, data.catalog.publishedRealProducts],
+                  [t.demo, data.catalog.demoProducts],
+                  [t.available, data.inventory.availableUnits],
+                  [t.reserved, data.inventory.reservedUnits],
+                  [t.low, data.inventory.lowVariants],
+                  [t.out, data.inventory.outVariants],
+                ].map(([label, value]) => (
+                  <div key={String(label)}>
+                    <dt>{label}</dt>
+                    <dd>{n(Number(value))}</dd>
+                  </div>
+                ))}
+              </dl>
+              <h3>{t.alerts}</h3>
+              <p className={s.hint}>{t.stockScope}</p>
+              {!data.inventory.alerts.length ? (
+                <p>{t.noAlerts}</p>
+              ) : (
+                <div className={s.tableWrap}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>{t.product}</th>
+                        <th>{t.variant}</th>
+                        <th>{t.available}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.inventory.alerts.map((alert) => (
+                        <tr key={alert.variantId}>
+                          <td>{alert.names[lang]}</td>
+                          <td>
+                            {alert.size} · {alert.color}
+                          </td>
+                          <td>{n(alert.available)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          )}
+          <section className={s.card}>
+            <h3>{t.daily}</h3>
+            <svg
+              viewBox="0 0 900 200"
+              className={s.chart}
+              role="img"
+              aria-labelledby={chartId}
+            >
+              <title id={chartId}>
+                {t.daily}: {money(data.revenue.completedAmount)}.{" "}
+                {date(data.period.from)} – {date(data.period.to)}
+              </title>
+              <path d="M0 180H900" stroke="#ddd" />
+              <polygon points={`0,180 ${points} 900,180`} fill="#e6001212" />
+              <polyline
+                points={points}
+                fill="none"
+                stroke="#e60012"
+                strokeWidth="3"
+                vectorEffect="non-scaling-stroke"
+              />
+            </svg>
+            <div className={s.chartLegend}>
+              <span>{date(data.period.from)}</span>
+              <span>
+                {money(
+                  max === 1 && data.revenue.completedAmount === 0 ? 0 : max,
+                )}
+              </span>
+              <span>{date(data.period.to)}</span>
+            </div>
+            <details>
+              <summary>{t.dailyTable}</summary>
+              <div className={s.tableWrap}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>{t.date}</th>
+                      <th>{t.orders}</th>
+                      <th>{t.completed}</th>
+                      <th>{t.amount}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.daily.map((day) => (
+                      <tr key={day.date}>
+                        <td>{date(day.date)}</td>
+                        <td>{n(day.createdOrders)}</td>
+                        <td>{n(day.completedOrders)}</td>
+                        <td>{money(day.completedAmount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </details>
+          </section>
+          <section className={s.card}>
+            <h3>
+              {t.states} · {n(data.orders.created)}
+            </h3>
+            <p className={s.hint}>{t.statesHint}</p>
+            <dl className={s.facts}>
+              {Object.entries(data.orders.byStatus).map(([state, value]) => (
+                <div key={state}>
+                  <dt>
+                    {state === "completed"
+                      ? t.completedStatus
+                      : t[state as keyof typeof t] || state}
+                  </dt>
+                  <dd>{n(value)}</dd>
+                </div>
+              ))}
+            </dl>
+            {!data.orders.created && <p>{t.empty}</p>}
+          </section>
+          {mode === "analytics" && (
+            <>
+              <section className={s.card}>
+                <h3>{t.top}</h3>
+                {!data.topProducts.length ? (
+                  <p>{t.empty}</p>
+                ) : (
+                  <div className={s.tableWrap}>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>{t.product}</th>
+                          <th>{t.units}</th>
+                          <th>{t.amount}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.topProducts.map((product) => (
+                          <tr key={product.productId}>
+                            <td>{product.names[lang]}</td>
+                            <td>{n(product.units)}</td>
+                            <td>{money(product.amount)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </section>
+              <section className={s.card}>
+                <h3>{t.categories}</h3>
+                <p className={s.hint}>{t.categoryHint}</p>
+                {!data.categorySales.length ? (
+                  <p>{t.empty}</p>
+                ) : (
+                  <div className={s.tableWrap}>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>{t.categories}</th>
+                          <th>{t.units}</th>
+                          <th>{t.amount}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.categorySales.map((category) => (
+                          <tr key={category.category ?? "unknown"}>
+                            <td>
+                              {category.category
+                                ? t[category.category as keyof typeof t] ||
+                                  category.category
+                                : t.unknown}
+                            </td>
+                            <td>{n(category.units)}</td>
+                            <td>{money(category.amount)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </section>
+            </>
+          )}
+          <details className={s.card}>
+            <summary>{t.quality}</summary>
+            <p className={s.hint}>{t.qualityHint}</p>
+            <dl className={s.facts}>
+              {[
+                [t.allOrders, data.quality.allOrders],
+                [t.verified, data.quality.verifiedRealOrders],
+                [t.demoOrders, data.quality.demoOrders],
+                [t.sandbox, data.quality.sandboxOrders],
+                [t.unverified, data.quality.unverifiedOrders],
+                [t.missingDate, data.quality.completedWithoutTimestamp],
+                [t.missingCategory, data.quality.linesWithoutCategory],
+                [t.partialRefund, data.quality.partialRefundOrders],
+              ].map(([label, value]) => (
+                <div key={String(label)}>
+                  <dt>{label}</dt>
+                  <dd>{n(Number(value))}</dd>
+                </div>
+              ))}
+            </dl>
+          </details>
+        </>
+      )}
+    </section>
+  );
 }

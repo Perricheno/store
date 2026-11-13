@@ -1358,3 +1358,20 @@ test("staff product identifiers persist, reject invalid barcodes and can be clea
   assert.equal("article" in cleared, false);
   assert.equal("barcode" in cleared.sizes[0]!, false);
 });
+
+
+test("published slug batches preserve requested order, hydrate stock, deduplicate and enforce bounds", async () => {
+  const db = await database();
+  await db.query(`INSERT INTO products(id,slug,category,gender,brand,names,description,price,published)
+    SELECT 'batch-'||name,'batch-'||name,'hoodies','unisex','Test','{"ru":"Товар","kk":"Тауар","en":"Product"}','{}',100,name<>'hidden'
+    FROM unnest(ARRAY['alpha','beta','hidden']) name`);
+  await db.query("INSERT INTO variants(id,product_id,size,color) VALUES('batch-alpha-variant','batch-alpha','M','Black'),('batch-beta-variant','batch-beta','S','Black')");
+  await db.query("INSERT INTO inventory(variant_id,branch_id,quantity,reserved) VALUES('batch-alpha-variant','one',4,1),('batch-alpha-variant','two',2,0)");
+  const products = await core.getPublishedProductsBySlugs(['batch-beta','missing-batch','batch-hidden','batch-alpha','batch-beta']);
+  assert.deepEqual(products.map((product) => product.slug),['batch-beta','batch-alpha']);
+  assert.equal(products[0].sizes[0].available,0);
+  assert.equal(products[1].sizes[0].available,5);
+  assert.deepEqual(await core.getPublishedProductsBySlugs([]),[]);
+  for (const slugs of [Array.from({length:25},(_,index)=>`batch-${index}`),['../batch-alpha'],[''],['Batch-alpha'],['x'.repeat(201)]])
+    await assert.rejects(core.getPublishedProductsBySlugs(slugs),{code:'VALIDATION'});
+});

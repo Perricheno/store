@@ -417,6 +417,22 @@ export async function getProduct(slug: string): Promise<Product | null> {
     )[0] ?? null
   );
 }
+/** Bounded recent-history lookup with one product query and one variant query. */
+export async function getPublishedProductsBySlugs(slugs: string[]): Promise<Product[]> {
+  const requested = [...new Set(parse(z.array(z.string().regex(/^[a-z0-9][a-z0-9-]{0,199}$/)).max(24), slugs))];
+  if (!requested.length) return [];
+  await initCore();
+  const db = await database();
+  const products = await hydrateProducts(db, await db.query(
+    "SELECT * FROM products WHERE published=true AND slug=ANY($1::text[])",
+    [requested],
+  ));
+  const bySlug = new Map(products.map((product) => [product.slug, product]));
+  return requested.flatMap((slug) => {
+    const product = bySlug.get(slug);
+    return product ? [product] : [];
+  });
+}
 async function cart(db: DB, visitorId: string): Promise<Cart> {
   const rows = await db.query(
     "SELECT c.*,v.product_id,v.size,v.color FROM carts c JOIN variants v ON v.id=c.variant_id WHERE c.visitor_id=$1 ORDER BY c.variant_id",

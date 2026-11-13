@@ -149,6 +149,7 @@ const dict = {
     manual_review: "Требует проверки",
     refund_required: "Нужен возврат",
     refunded: "Возвращён",
+    refundWallet: "Вернуть на баланс",
     inventory: "Остатки по филиалам",
     branch: "Филиал",
     physical: "Физическое количество",
@@ -275,6 +276,7 @@ const dict = {
     manual_review: "Тексеру қажет",
     refund_required: "Қайтарым қажет",
     refunded: "Қайтарылды",
+    refundWallet: "Балансқа қайтару",
     inventory: "Филиалдардағы қалдықтар",
     branch: "Филиал",
     physical: "Нақты саны",
@@ -401,6 +403,7 @@ const dict = {
     manual_review: "Needs review",
     refund_required: "Refund required",
     refunded: "Refunded",
+    refundWallet: "Refund to balance",
     inventory: "Stock by branch",
     branch: "Branch",
     physical: "Physical quantity",
@@ -1728,6 +1731,24 @@ export function Dashboard() {
                 {t[next[selectedOrder.status] as keyof typeof t] || t.goNext}
               </button>
             )}
+            {selectedOrder.paymentMethod === "wallet" &&
+              selectedOrder.paymentStatus === "paid" &&
+              ["paid", "processing", "ready", "completed", "refund_required"].includes(selectedOrder.status) && (
+                <button
+                  className={s.button}
+                  disabled={busy}
+                  onClick={() =>
+                    run(async () => {
+                      await api(`staff/orders/${selectedOrder.id}/wallet-refund`, "POST");
+                      orderDialog.current?.close();
+                      setSelectedOrder(null);
+                      await load();
+                    })
+                  }
+                >
+                  {t.refundWallet}
+                </button>
+              )}
             {error && <p className={s.error}>{error}</p>}
           </>
         )}

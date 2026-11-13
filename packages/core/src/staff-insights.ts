@@ -2,8 +2,12 @@ import type { DB } from "./db";
 import type { StaffInsights } from "./types";
 
 /** One statement gives every aggregate the same database snapshot. */
-export async function queryStaffInsights(db: DB, days: 7 | 30 | 90 | 365): Promise<StaffInsights> {
-  const [row] = await db.query(`
+export async function queryStaffInsights(
+  db: DB,
+  days: 7 | 30 | 90 | 365,
+): Promise<StaffInsights> {
+  const [row] = await db.query(
+    `
 WITH bounds AS (
  SELECT now() AS until, ((now() AT TIME ZONE 'Asia/Almaty')::date - ($1::int - 1))::timestamp AT TIME ZONE 'Asia/Almaty' AS since
 ), history AS (
@@ -12,7 +16,13 @@ WITH bounds AS (
 ), base AS (
  SELECT o.*, p.status AS payment_status, p.environment, h.completed_at,
    (jsonb_array_length(o.lines)>0 AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(o.lines) l WHERE l->>'isDemo' IS DISTINCT FROM 'false')) AS real_lines,
-   (p.status='paid' AND p.environment='production' AND p.amount=o.total AND EXISTS (SELECT 1 FROM payment_events e WHERE e.order_id=o.id AND e.event_type='paid')) AS verified
+   (p.status='paid' AND p.environment='production' AND p.amount=o.total AND (
+     (p.method='apipay' AND EXISTS (SELECT 1 FROM payment_events e WHERE e.order_id=o.id AND e.event_type='paid'))
+     OR (p.method='wallet' AND EXISTS (
+       SELECT 1 FROM wallet_entries e WHERE e.order_id=o.id AND e.kind='order_debit'
+       AND e.user_id=o.user_id AND e.environment=p.environment AND e.amount=o.total
+     ) AND NOT EXISTS (SELECT 1 FROM wallet_entries e WHERE e.order_id=o.id AND e.kind='order_refund'))
+   )) AS verified
  FROM orders o LEFT JOIN payments p ON p.order_id=o.id LEFT JOIN history h ON h.entity_id=o.id
 ), completed AS (
  SELECT b.* FROM base b, bounds t WHERE b.real_lines AND b.verified AND b.status='completed' AND b.completed_at>=t.since AND b.completed_at<t.until
@@ -43,6 +53,8 @@ SELECT jsonb_build_object(
  'topProducts',coalesce((SELECT jsonb_agg(jsonb_build_object('productId',id,'names',names,'units',units,'amount',amount) ORDER BY amount DESC,id) FROM (SELECT * FROM product_sales ORDER BY amount DESC,id LIMIT 10) p),'[]'::jsonb),
  'categorySales',coalesce((SELECT jsonb_agg(jsonb_build_object('category',category,'units',units,'amount',amount) ORDER BY amount DESC,category) FROM category_sales),'[]'::jsonb),
  'quality',(SELECT jsonb_build_object('allOrders',count(*),'verifiedRealOrders',count(*) FILTER(WHERE real_lines AND verified),'demoOrders',count(*) FILTER(WHERE NOT real_lines),'sandboxOrders',count(*) FILTER(WHERE environment IN ('sandbox','mock')),'unverifiedOrders',count(*) FILTER(WHERE NOT coalesce(verified,false)),'completedWithoutTimestamp',count(*) FILTER(WHERE status='completed' AND completed_at IS NULL),'linesWithoutCategory',(SELECT count(*) FROM sold WHERE nullif(l->>'category','') IS NULL),'partialRefundOrders',count(*) FILTER(WHERE payment_status='partially_refunded')) FROM base)
-) AS insights FROM bounds t`, [days]);
+) AS insights FROM bounds t`,
+    [days],
+  );
   return row.insights as StaffInsights;
 }

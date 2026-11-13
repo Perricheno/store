@@ -234,6 +234,7 @@ for (const shouldFail of [false, true]) {
 
 test("staff can edit identifiers and selected product variant displays its barcode", async ({ page }) => {
   await loginOwner(page);
+  await page.getByRole("button", { name: "Товары", exact: true }).click();
   const original = ((await (await page.request.get("/api/staff/products")).json()) as Product[])
     .find((product) => product.slug === "city-tee")!;
   const size = original.sizes.find((variant) => variant.available > 0)!;
