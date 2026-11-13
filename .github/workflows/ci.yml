@@ -38,6 +38,7 @@ jobs:
         env:
           CORE_TEST_DATABASE_URL: postgres://urbanmag_test:urbanmag_test@localhost:5432/urbanmag_test
           CORE_WALLET_TEST_DATABASE_URL: postgres://urbanmag_test:urbanmag_test@localhost:5432/urbanmag_wallet_test
+          CORE_CART_TEST_DATABASE_URL: postgres://urbanmag_test:urbanmag_test@localhost:5432/urbanmag_cart_test
   checks:
     runs-on: ubuntu-latest
     steps:

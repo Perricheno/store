@@ -8,6 +8,22 @@ export type Invoice = {
   amount?: string | number;
   external_order_id?: string;
 };
+function validateMode(mode: string, appEnv: string | undefined): asserts mode is Mode {
+  if (!["mock", "sandbox", "production"].includes(mode))
+    throw new Error("Invalid APIPAY_MODE");
+  if (mode === "mock" && appEnv === "production")
+    throw new Error("Mock payments are forbidden in production");
+}
+
+/** A missing provider key leaves payment jobs pending without exhausting retries. */
+export function configuredApiPay(
+  mode: string,
+  key: string,
+  appEnv: string | undefined,
+): { mode: Mode; api: ApiPay | null } {
+  validateMode(mode, appEnv);
+  return { mode, api: mode !== "mock" && !key.trim() ? null : new ApiPay(mode, key) };
+}
 export class ApiPay {
   private mode: Mode;
   private key: string;
@@ -23,11 +39,8 @@ export class ApiPay {
     this.key = key;
     this.base = base;
     this.request = request;
-    if (!["mock", "sandbox", "production"].includes(mode))
-      throw new Error("Invalid APIPAY_MODE");
-    if (mode === "mock" && process.env.APP_ENV === "production")
-      throw new Error("Mock payments are forbidden in production");
-    if (mode !== "mock" && !key) throw new Error("APIPAY_API_KEY is required");
+    validateMode(mode, process.env.APP_ENV);
+    if (mode !== "mock" && !key.trim()) throw new Error("APIPAY_API_KEY is required");
   }
   private async call(path: string, init: RequestInit = {}) {
     const response = await this.request(`${this.base}${path}`, {

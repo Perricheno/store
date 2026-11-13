@@ -7,6 +7,8 @@ import { money, type Locale } from "../lib/i18n";
 import { request } from "./shop-client";
 import { buyerCopy } from "./buyer-copy";
 import { ProductMedia } from "./shop-media";
+import { ProductQuickAdd } from "./shop-product-features";
+import h from "./shop-buyer-history.module.css";
 import s from "./shop-buyer.module.css";
 
 const eventName = "urbanmag:history";
@@ -98,8 +100,20 @@ export function BuyerHistory({ locale, controls = true }: { locale: Locale; cont
   );
 }
 function ProductShelf({ products, locale }: { products: Product[]; locale: Locale }) {
-  return <div className={s.shelf}>{products.map((product) => <Link prefetch={false} href={`/${locale}/p/${product.slug}`} key={product.id} className={s.shelfCard}>
-    <div className={s.shelfImage}><ProductMedia product={product} locale={locale} /></div>
-    <strong>{product.names[locale] || product.names.ru}</strong><span>{money(product.price, locale)}</span>
-  </Link>)}</div>;
+  return (
+    <div className={s.shelf}>
+      {products.map((product) => (
+        <article key={product.id} className={`${s.shelfCard} ${h.card}`}>
+          <Link prefetch={false} href={`/${locale}/p/${product.slug}`} className={h.link}>
+            <div className={s.shelfImage}><ProductMedia product={product} locale={locale} /></div>
+            <strong>{product.names[locale] || product.names.ru}</strong>
+            <span>{money(product.price, locale)}</span>
+          </Link>
+          <div className={h.quickAddFrame}>
+            <ProductQuickAdd product={product} locale={locale} />
+          </div>
+        </article>
+      ))}
+    </div>
+  );
 }

@@ -3,7 +3,9 @@ import type { Cart } from "../components/shop-types";
 
 export const emptyCart: Cart = { items: [], total: 0 };
 type Mutation = {
-  variantId: string;
+  variantId: string | null;
+  productId?: string;
+  selectVariantId?: string;
   quantity: number;
   method: "POST" | "PATCH";
   product?: Product;
@@ -45,20 +47,30 @@ export function createCartStore(transport: Transport) {
       items: [...(base?.items ?? [])],
     };
     for (const op of queue) {
-      const current = cart.items.find(
-        (item) => item.variantId === op.variantId,
-      );
-      const quantity =
-        op.method === "POST"
+      const current = cart.items.find((item) => op.variantId
+        ? item.variantId === op.variantId
+        : item.variantId === null && item.product.id === op.productId);
+      // A size choice moves the current source row, including quantities learned
+      // during bootstrap or confirmed by earlier queued writes.
+      if (op.selectVariantId && !current) continue;
+      const targetId = op.selectVariantId ?? op.variantId;
+      const product = current?.product ?? op.product;
+      const target = cart.items.find((item) => targetId
+        ? item.variantId === targetId
+        : item.variantId === null && item.product.id === op.productId);
+      const moving = Boolean(op.selectVariantId && op.selectVariantId !== op.variantId);
+      const quantity = op.selectVariantId
+        ? current!.quantity + (moving ? target?.quantity ?? 0 : 0)
+        : op.method === "POST"
           ? (current?.quantity ?? 0) + op.quantity
           : op.quantity;
-      cart.items = cart.items.filter((item) => item.variantId !== op.variantId);
-      if (quantity > 0 && (current || op.product))
+      cart.items = cart.items.filter((item) => item !== current && (!moving || item !== target));
+      if (quantity > 0 && product)
         cart.items.push({
-          variantId: op.variantId,
+          variantId: targetId,
           quantity,
-          size: current?.size ?? op.size!,
-          product: current?.product ?? op.product!,
+          size: targetId ? (product.sizes.find((v) => v.id === targetId)?.size ?? op.size ?? "") : "",
+          product,
         });
     }
     cart.total = cart.items.reduce(
@@ -104,7 +116,16 @@ export function createCartStore(transport: Transport) {
         version++;
         writing = true;
         try {
-          base = await transport.mutate(op);
+          let operation: Mutation = op;
+          if (op.selectVariantId) {
+            const source = base?.items.find((item) => op.variantId
+              ? item.variantId === op.variantId
+              : item.variantId === null && item.product.id === op.productId);
+            if (!source)
+              throw Object.assign(new Error("CART_CHANGED"), { code: "CART_CHANGED" });
+            operation = { ...op, quantity: source.quantity };
+          }
+          base = await transport.mutate(operation);
           writing = false;
           version++;
           queue.shift();
@@ -138,25 +159,31 @@ export function createCartStore(transport: Transport) {
     }
   }
   function enqueue(operation: Mutation): Promise<Cart> {
-    const current = snapshot.cart.items.find(
-      (item) => item.variantId === operation.variantId,
-    );
-    const quantity =
-      operation.method === "POST"
+    const current = snapshot.cart.items.find((item) => operation.variantId
+      ? item.variantId === operation.variantId
+      : item.variantId === null && item.product.id === operation.productId);
+    const moving = Boolean(operation.selectVariantId && operation.selectVariantId !== operation.variantId);
+    const targetId = operation.selectVariantId ?? operation.variantId;
+    const target = snapshot.cart.items.find((item) => targetId
+      ? item.variantId === targetId
+      : item.variantId === null && item.product.id === operation.productId);
+    const quantity = operation.selectVariantId
+      ? (current?.quantity ?? 0) + (moving ? target?.quantity ?? 0 : 0)
+      : operation.method === "POST"
         ? (current?.quantity ?? 0) + operation.quantity
         : operation.quantity;
     const product = operation.product ?? current?.product;
-    const available = product?.sizes.find(
-      (size) => size.id === operation.variantId,
-    )?.available;
-    if (
-      !Number.isInteger(quantity) ||
-      quantity < 0 ||
-      (available !== undefined && quantity > available)
-    )
-      return Promise.reject(
-        Object.assign(new Error("OUT_OF_STOCK"), { code: "OUT_OF_STOCK" }),
-      );
+    const available = targetId
+      ? product?.sizes.find((size) => size.id === targetId)?.available
+      : product?.sizes.reduce((sum, size) => sum + size.available, 0);
+    const others = snapshot.cart.items.filter((item) => item.product.id === product?.id && item !== current && item !== target)
+      .reduce((sum, item) => sum + item.quantity, 0);
+    const totalAvailable = product?.sizes.reduce((sum, size) => sum + size.available, 0);
+    const removing = operation.method === "PATCH" && operation.quantity === 0 && !operation.selectVariantId;
+    if (!removing && (!Number.isInteger(quantity) || quantity < 0 || quantity > 50 ||
+      (available !== undefined && quantity > available) ||
+      (totalAvailable !== undefined && quantity + others > totalAvailable)))
+      return Promise.reject(Object.assign(new Error("OUT_OF_STOCK"), { code: "OUT_OF_STOCK" }));
     const promise = new Promise<Cart>((resolve, reject) =>
       queue.push({ ...operation, resolve, reject }),
     );
@@ -188,8 +215,22 @@ export function createCartStore(transport: Transport) {
         size: variant.size,
       });
     },
-    setQuantity(variantId: string, quantity: number) {
-      return enqueue({ variantId, quantity, method: "PATCH" });
+    addProduct(product: Product, quantity = 1) {
+      const only = product.sizes.length === 1 ? product.sizes[0] : undefined;
+      return enqueue({ variantId: only?.id ?? null, productId: only ? undefined : product.id,
+        quantity, method: "POST", product, size: only?.size });
+    },
+    setQuantity(lineKey: string, quantity: number) {
+      const item = snapshot.cart.items.find((item) => (item.variantId ?? item.product.id) === lineKey);
+      return enqueue({ variantId: item?.variantId ?? (item ? null : lineKey),
+        productId: item?.variantId === null ? item.product.id : undefined, quantity, method: "PATCH" });
+    },
+    selectSize(lineKey: string, selectVariantId: string) {
+      const item = snapshot.cart.items.find((item) => (item.variantId ?? item.product.id) === lineKey);
+      if (!item) return Promise.reject(new Error("Cart item unavailable"));
+      return enqueue({ variantId: item.variantId, productId: item.variantId ? undefined : item.product.id,
+        // Size choices carry identity; the pump resolves the current quantity.
+        quantity: 0, selectVariantId, method: "PATCH" });
     },
     async settled(): Promise<Cart> {
       if (!base && !queue.length) await refresh();

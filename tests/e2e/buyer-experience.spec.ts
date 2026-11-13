@@ -12,11 +12,13 @@ test("device history persists, can be cleared, and honors the off switch", async
   const save = page.getByRole("checkbox", { name: "Сохранять просмотры на этом устройстве" });
   await save.uncheck();
   await page.goto("/ru/p/city-tee");
+  await expect(page.getByRole("button", { name: "M", exact: true })).toBeEnabled();
   await page.goto("/ru/account");
   await expect(save).not.toBeChecked();
   await expect(page.locator('section[aria-labelledby="recent-heading"]').getByRole("link", { name: "Футболка City" })).toHaveCount(0);
   await save.check();
   await page.goto("/ru/p/city-tee");
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("urbanmag:history:v1") || "{}").entries?.length)).toBe(1);
   await page.goto("/ru/account");
   await page.getByRole("button", { name: "Очистить историю", exact: true }).click();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem("urbanmag:history:v1")!).entries)).toEqual([]);

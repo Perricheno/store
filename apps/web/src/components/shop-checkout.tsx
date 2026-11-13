@@ -6,6 +6,7 @@ import { ArrowRight, Check, MapPin } from "@phosphor-icons/react";
 import { dictionary, money } from "../lib/i18n";
 import s from "./shop.module.css";
 import w from "./shop-wallet.module.css";
+import c from "./shop-cart.module.css";
 import { walletCopy, walletError } from "./wallet-copy";
 import type { Wallet } from "@urbanmag/core";
 import { type Common, type Order } from "./shop-types";
@@ -19,7 +20,6 @@ import {
   pickupAddress,
   pickupHours,
 } from "./shop-client";
-import { ShopShell } from "./shop-shell";
 import { ErrorNotice, PageTitle, Empty, CartSummary } from "./shop-ui";
 
 export function CheckoutView({ locale, settings, initialCart }: Common) {
@@ -40,6 +40,12 @@ export function CheckoutView({ locale, settings, initialCart }: Common) {
     [busy, setBusy] = useState(false),
     [formError, setFormError] = useState(""),
     [order, setOrder] = useState<Order | null>(null);
+  const chooseSize = {
+    ru: "Выберите размер",
+    kk: "Өлшемді таңдаңыз",
+    en: "Choose a size",
+  }[locale];
+  const sizesRequired = cart.items.some((item) => !item.variantId);
   const idempotency = useRef("");
   const submitting = useRef(false);
   useEffect(() => {
@@ -105,6 +111,7 @@ export function CheckoutView({ locale, settings, initialCart }: Common) {
     e.preventDefault();
     if (
       !ready ||
+      sizesRequired ||
       submitting.current ||
       (paymentMethod === "wallet" &&
         (!wallet ||
@@ -121,6 +128,9 @@ export function CheckoutView({ locale, settings, initialCart }: Common) {
       if (!confirmedCart.items.length) {
         await refresh();
         return;
+      }
+      if (confirmedCart.items.some((item) => !item.variantId)) {
+        throw Object.assign(new Error("SIZE_REQUIRED"), { code: "SIZE_REQUIRED" });
       }
       if (confirmedCart.total !== cart.total) {
         throw Object.assign(new Error("TOTAL_CHANGED"), {
@@ -141,7 +151,10 @@ export function CheckoutView({ locale, settings, initialCart }: Common) {
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error) {
       const code = (error as { code?: string }).code;
-      if (code === "TOTAL_CHANGED") {
+      if (code === "SIZE_REQUIRED") {
+        await refresh();
+        setFormError(chooseSize);
+      } else if (code === "TOTAL_CHANGED") {
         await refresh();
         setFormError(
           {
@@ -200,7 +213,7 @@ export function CheckoutView({ locale, settings, initialCart }: Common) {
     }
   }
   return (
-    <ShopShell locale={locale} settings={settings} initialCart={initialCart}>
+    <>
       <section className={s.innerPage}>
         {order ? (
           <div className={s.orderSuccess}>
@@ -422,11 +435,11 @@ export function CheckoutView({ locale, settings, initialCart }: Common) {
                 <CartSummary cart={cart} locale={locale}>
                   <div className={s.checkoutPreview}>
                     {cart.items.map((item) => (
-                      <div key={item.variantId}>
+                      <div key={item.variantId ?? item.product.id}>
                         <span>
                           {item.product.names[locale]}{" "}
                           <small>
-                            {item.size} × {item.quantity}
+                            {item.variantId ? item.size : chooseSize} × {item.quantity}
                           </small>
                         </span>
                         <strong>
@@ -435,6 +448,9 @@ export function CheckoutView({ locale, settings, initialCart }: Common) {
                       </div>
                     ))}
                   </div>
+                  {sizesRequired && <Link prefetch={false} className={c.warning} href={`/${locale}/cart`}>
+                    <span className={c.warningIcon} aria-hidden="true">!</span>{chooseSize}
+                  </Link>}
                   {formError && <ErrorNotice text={formError} />}
                   {ready === false && (
                     <p className={s.note} role="status">
@@ -449,6 +465,7 @@ export function CheckoutView({ locale, settings, initialCart }: Common) {
                     className={s.primaryButton}
                     disabled={
                       busy ||
+                      sizesRequired ||
                       !ready ||
                       (paymentMethod === "wallet" &&
                         (!wallet ||
@@ -468,6 +485,6 @@ export function CheckoutView({ locale, settings, initialCart }: Common) {
           </>
         )}
       </section>
-    </ShopShell>
+    </>
   );
 }

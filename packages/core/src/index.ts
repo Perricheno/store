@@ -435,7 +435,9 @@ export async function getPublishedProductsBySlugs(slugs: string[]): Promise<Prod
 }
 async function cart(db: DB, visitorId: string): Promise<Cart> {
   const rows = await db.query(
-    "SELECT c.*,v.product_id,v.size,v.color FROM carts c JOIN variants v ON v.id=c.variant_id WHERE c.visitor_id=$1 ORDER BY c.variant_id",
+    `SELECT c.variant_id,c.quantity,v.product_id,v.size,v.color FROM carts c JOIN variants v ON v.id=c.variant_id WHERE c.visitor_id=$1
+     UNION ALL SELECT NULL AS variant_id,quantity,product_id,NULL AS size,NULL AS color FROM cart_pending_sizes WHERE visitor_id=$1
+     ORDER BY product_id,variant_id`,
     [visitorId],
   );
   const products = await hydrateProducts(
@@ -455,10 +457,12 @@ async function cart(db: DB, visitorId: string): Promise<Cart> {
         variantId: r.variant_id,
         quantity: r.quantity,
         product,
-        size: r.size,
-        color: r.color,
+        size: r.size ?? "",
+        color: r.color ?? "",
         available:
-          product.sizes.find((v) => v.id === r.variant_id)?.available ?? 0,
+          r.variant_id
+            ? (product.sizes.find((v) => v.id === r.variant_id)?.available ?? 0)
+            : product.sizes.reduce((sum, v) => sum + v.available, 0),
         lineTotal: product.price * r.quantity,
       },
     ];
@@ -479,28 +483,78 @@ export async function updateCart(
   variantId: string,
   quantity: number,
 ): Promise<Cart> {
+  return mutateCart(visitorId, { variantId, quantity, mode: "set" });
+}
+
+const cartMutationSchema = z.object({
+  variantId: z.string().min(1).max(200).optional(),
+  productId: z.string().min(1).max(200).optional(),
+  selectVariantId: z.string().min(1).max(200).optional(),
+  quantity: z.number().int().min(0).max(50),
+  mode: z.enum(["add", "set"]),
+}).refine((value) => Boolean(value.variantId) !== Boolean(value.productId))
+  .refine((value) => !value.selectVariantId || value.mode === "set");
+
+/** All increments, size changes and merges share the visitor lock. */
+export async function mutateCart(visitorId: string, input: unknown): Promise<Cart> {
   await initCore();
-  parse(z.number().int().min(0).max(50), quantity);
+  const data = parse(cartMutationSchema, input);
   return transaction(async (db) => {
     await lockVisitor(db, visitorId);
-    if (quantity === 0)
-      await db.query(
-        "DELETE FROM carts WHERE visitor_id=$1 AND variant_id=$2",
-        [visitorId, variantId],
-      );
-    else {
-      const variants = await db.query(
-        "SELECT v.id,COALESCE(SUM(i.quantity-i.reserved),0)::integer AS available FROM variants v JOIN products p ON p.id=v.product_id LEFT JOIN inventory i ON i.variant_id=v.id WHERE v.id=$1 AND p.published=true GROUP BY v.id",
-        [variantId],
-      );
-      if (!variants[0]) fail(404, "NOT_FOUND", "Товар не найден");
-      if (variants[0].available < quantity)
-        fail(409, "OUT_OF_STOCK", "Недостаточно товара");
-      await db.query(
-        "INSERT INTO carts(visitor_id,variant_id,quantity) VALUES($1,$2,$3) ON CONFLICT(visitor_id,variant_id) DO UPDATE SET quantity=EXCLUDED.quantity",
-        [visitorId, variantId, quantity],
-      );
+    const before = await cart(db, visitorId);
+    const source = before.items.find((item) => data.variantId
+      ? item.variantId === data.variantId
+      : item.variantId === null && item.product.id === data.productId);
+    // Removing a row remains possible even after its product is unpublished.
+    if (!data.selectVariantId && data.mode === "set" && data.quantity === 0) {
+      if (data.variantId) await db.query("DELETE FROM carts WHERE visitor_id=$1 AND variant_id=$2", [visitorId, data.variantId]);
+      else await db.query("DELETE FROM cart_pending_sizes WHERE visitor_id=$1 AND product_id=$2", [visitorId, data.productId]);
+      return cart(db, visitorId);
     }
+    const productRows = await db.query(
+      data.variantId
+        ? "SELECT p.* FROM products p JOIN variants v ON v.product_id=p.id WHERE v.id=$1 AND p.published=true"
+        : "SELECT * FROM products WHERE id=$1 AND published=true",
+      [data.variantId ?? data.productId],
+    );
+    const [product] = await hydrateProducts(db, productRows);
+    if (!product) fail(404, "NOT_FOUND", "Товар не найден");
+    let targetId = data.selectVariantId ?? data.variantId ?? null;
+    // A product with one actual variant needs no size decision. A sold-out alternative
+    // does not make a multi-size product a one-size product.
+    if (!targetId && product.sizes.length === 1) targetId = product.sizes[0].id;
+    const target = targetId ? product.sizes.find((v) => v.id === targetId) : undefined;
+    if (targetId && !target) fail(400, "INVALID_VARIANT", "Размер не относится к товару");
+    if (data.selectVariantId && !source) fail(409, "CART_CHANGED", "Корзина изменилась");
+    const moving = Boolean(source && source.variantId !== targetId);
+    const existingTarget = before.items.find((item) => targetId
+      ? item.variantId === targetId
+      : item.variantId === null && item.product.id === product.id);
+    // A size change moves the entire locked source. Client quantity may have been
+    // captured before bootstrap completed or before another tab changed the row.
+    const requested = data.selectVariantId
+      ? source!.quantity + (moving ? existingTarget?.quantity ?? 0 : 0)
+      : data.mode === "add"
+        ? (existingTarget?.quantity ?? 0) + (moving ? source!.quantity : 0) + data.quantity
+        : moving ? data.quantity + (existingTarget?.quantity ?? 0) : data.quantity;
+    parse(z.number().int().min(1).max(50), requested);
+    const otherQuantity = before.items.filter((item) => item.product.id === product.id && item !== source && item !== existingTarget)
+      .reduce((sum, item) => sum + item.quantity, 0);
+    const available = product.sizes.reduce((sum, v) => sum + v.available, 0);
+    if (requested > (target?.available ?? available) || requested + otherQuantity > available)
+      fail(409, "OUT_OF_STOCK", "Недостаточно товара");
+    if (moving) {
+      if (source!.variantId) await db.query("DELETE FROM carts WHERE visitor_id=$1 AND variant_id=$2", [visitorId, source!.variantId]);
+      else await db.query("DELETE FROM cart_pending_sizes WHERE visitor_id=$1 AND product_id=$2", [visitorId, product.id]);
+    }
+    if (targetId) await db.query(
+      "INSERT INTO carts(visitor_id,variant_id,quantity) VALUES($1,$2,$3) ON CONFLICT(visitor_id,variant_id) DO UPDATE SET quantity=EXCLUDED.quantity",
+      [visitorId, targetId, requested],
+    );
+    else await db.query(
+      "INSERT INTO cart_pending_sizes(visitor_id,product_id,quantity) VALUES($1,$2,$3) ON CONFLICT(visitor_id,product_id) DO UPDATE SET quantity=EXCLUDED.quantity",
+      [visitorId, product.id, requested],
+    );
     return cart(db, visitorId);
   });
 }
@@ -844,10 +898,10 @@ export async function createCheckout(
             variantId: l.variantId,
             quantity: l.quantity,
           }))
-          .sort((a: any, b: any) => a.variantId.localeCompare(b.variantId));
+          .sort((a: any, b: any) => (a.variantId ?? "").localeCompare(b.variantId ?? ""));
         const now = current.items
           .map((l) => ({ variantId: l.variantId, quantity: l.quantity }))
-          .sort((a, b) => a.variantId.localeCompare(b.variantId));
+          .sort((a, b) => (a.variantId ?? "").localeCompare(b.variantId ?? ""));
         if (
           JSON.stringify(stored) !== JSON.stringify(now) ||
           current.total !== existing.total
@@ -856,6 +910,8 @@ export async function createCheckout(
       }
       return { order: await orderView(db, existing) };
     }
+    if (current.items.some((item) => !item.variantId))
+      fail(409, "SIZE_REQUIRED", "Выберите размер");
     if (data.paymentMethod === "wallet" && !sessionUserId)
       fail(401, "UNAUTHORIZED", "Войдите в кабинет");
     const wallet =
@@ -917,7 +973,7 @@ export async function createCheckout(
     const lines: OrderLine[] = fresh.items.map((i) => ({
       productId: i.product.id,
       category: i.product.category,
-      variantId: i.variantId,
+      variantId: i.variantId!,
       name: i.product.names[data.locale],
       names: i.product.names,
       size: i.size,
@@ -1005,7 +1061,7 @@ export async function createCheckout(
       ],
     );
     for (const item of [...fresh.items].sort((a, b) =>
-      a.variantId.localeCompare(b.variantId),
+      (a.variantId ?? "").localeCompare(b.variantId ?? ""),
     )) {
       const inventory = await db.query(
         "SELECT * FROM inventory WHERE variant_id=$1 ORDER BY branch_id FOR UPDATE",
@@ -1051,6 +1107,7 @@ export async function createCheckout(
       await db.query("UPDATE orders SET status='paid' WHERE id=$1", [orderId]);
     } else await enqueue(db, "create_invoice", { orderId });
     await db.query("DELETE FROM carts WHERE visitor_id=$1", [visitorId]);
+    await db.query("DELETE FROM cart_pending_sizes WHERE visitor_id=$1", [visitorId]);
     await audit(db, attachedUserId, "order.created", orderId, {
       total: fresh.total,
       environment,
@@ -1867,14 +1924,15 @@ export async function expireReservations(): Promise<number> {
   await initCore();
   return 0;
 }
-export async function claimJob(workerId = "worker"): Promise<Job | null> {
+export async function claimJob(workerId = "worker", allowedTypes?: Job["type"][]): Promise<Job | null> {
   await initCore();
   return transaction(async (db) => {
     await db.query(
       "UPDATE jobs SET status='failed',locked_at=NULL,locked_by=NULL,last_error='Worker lease expired after final attempt' WHERE status='running' AND locked_at<now()-interval '5 minutes' AND attempts>=8",
     );
     const [row] = await db.query(
-      "SELECT * FROM jobs WHERE (status='pending' AND available_at<=now()) OR (status='running' AND locked_at<now()-interval '5 minutes') ORDER BY available_at,id FOR UPDATE SKIP LOCKED LIMIT 1",
+      "SELECT * FROM jobs WHERE ((status='pending' AND available_at<=now()) OR (status='running' AND locked_at<now()-interval '5 minutes')) AND ($1::text[] IS NULL OR type=ANY($1::text[])) ORDER BY available_at,id FOR UPDATE SKIP LOCKED LIMIT 1",
+      [allowedTypes ?? null],
     );
     if (!row) return null;
     await db.query(

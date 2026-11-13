@@ -9,5 +9,5 @@ export default async function Page({
 }) {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
-  return <Recovery locale={locale} />;
+  return <Recovery locale={locale} embedded />;
 }

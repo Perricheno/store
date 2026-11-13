@@ -1,19 +1,10 @@
 "use client";
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useId,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
-import { Check, Plus, X } from "@phosphor-icons/react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Check, Plus } from "@phosphor-icons/react";
 import type { Product } from "@urbanmag/core";
 import { dictionary, type Locale } from "../lib/i18n";
-import { localized, optimisticAddToCart } from "./shop-client";
+import { localized, optimisticAddProductToCart } from "./shop-client";
 import f from "./shop-product-features.module.css";
 
 export function ProductPromotion({
@@ -79,91 +70,9 @@ export function ProductSpecifications({
   );
 }
 
-type QuickAddSelection = {
-  product: Product;
-  locale: Locale;
-  trigger: HTMLButtonElement;
-  add: (variant: Product["sizes"][number]) => void;
-};
-
-const QuickAddContext = createContext<
-  ((selection: QuickAddSelection) => void) | null
->(null);
-
+// Retain the wrapper API used by storefront and buyer-history cards.
 export function ProductQuickAddProvider({ children }: { children: ReactNode }) {
-  const [selection, setSelection] = useState<QuickAddSelection | null>(null);
-  const dialog = useRef<HTMLDialogElement>(null);
-  const trigger = useRef<HTMLButtonElement | null>(null);
-  const titleId = useId();
-  const open = useCallback((next: QuickAddSelection) => {
-    trigger.current = next.trigger;
-    setSelection(next);
-  }, []);
-
-  useEffect(() => {
-    if (selection && dialog.current && !dialog.current.open)
-      dialog.current.showModal();
-  }, [selection]);
-
-  function close() {
-    dialog.current?.close();
-    trigger.current?.focus();
-  }
-
-  const available =
-    selection?.product.sizes.filter((variant) => variant.available > 0) ?? [];
-  const t = selection ? dictionary(selection.locale) : null;
-  return (
-    <QuickAddContext.Provider value={open}>
-      {children}
-      <dialog
-        ref={dialog}
-        className={f.sizeDialog}
-        aria-labelledby={titleId}
-        onClose={() => {
-          setSelection(null);
-          trigger.current?.focus();
-          trigger.current = null;
-        }}
-        onClick={(event) => {
-          if (event.target === event.currentTarget) close();
-        }}
-      >
-        {selection && t && (
-          <>
-            <div className={f.dialogHead}>
-              <h2 id={titleId}>{t.selectSize}</h2>
-              <button type="button" aria-label={t.close} onClick={close}>
-                <X size={22} aria-hidden="true" />
-              </button>
-            </div>
-            <p className={f.dialogProduct}>
-              {localized(selection.product.names, selection.locale)}
-            </p>
-            <div className={f.sizes}>
-              {available.map((variant) => (
-                <button
-                  type="button"
-                  key={variant.id}
-                  onClick={() => {
-                    close();
-                    selection.add(variant);
-                  }}
-                >
-                  {variant.size}
-                  {available.some(
-                    (other) =>
-                      other.size === variant.size &&
-                      other.color !== variant.color,
-                  ) && <small>{variant.color}</small>}
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-      </dialog>
-    </QuickAddContext.Provider>
-  );
+  return children;
 }
 
 export function ProductQuickAdd({
@@ -174,7 +83,6 @@ export function ProductQuickAdd({
   locale: Locale;
 }) {
   const t = dictionary(locale);
-  const open = useContext(QuickAddContext);
   const lock = useRef(false);
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -183,14 +91,14 @@ export function ProductQuickAdd({
   const available = product.sizes.filter((variant) => variant.available > 0);
   const name = localized(product.names, locale);
   useEffect(() => setReady(true), []);
-  async function add(variant: Product["sizes"][number]) {
+  async function add() {
     if (lock.current) return;
     lock.current = true;
     setBusy(true);
     setAdded(true);
     setError(false);
     try {
-      await optimisticAddToCart(product, variant);
+      await optimisticAddProductToCart(product);
     } catch {
       setAdded(false);
       setError(true);
@@ -206,14 +114,7 @@ export function ProductQuickAdd({
         className={f.quickAdd}
         disabled={!ready || busy || !available.length}
         aria-label={`${added ? t.addedCart : available.length ? t.addCart : t.soldOut}: ${name}`}
-        aria-haspopup={available.length > 1 ? "dialog" : undefined}
-        onClick={(event) => {
-          if (lock.current) return;
-          setError(false);
-          if (available.length === 1) void add(available[0]);
-          else if (available.length > 1)
-            open?.({ product, locale, trigger: event.currentTarget, add });
-        }}
+        onClick={() => { void add(); }}
       >
         {added ? (
           <Check size={22} weight="bold" aria-hidden="true" />

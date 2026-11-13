@@ -39,7 +39,8 @@ export interface Product {
   createdAt: string;
 }
 export interface CartItem {
-  variantId: string;
+  /** null until the customer chooses a real variant in their cart. */
+  variantId: string | null;
   quantity: number;
   product: Product;
   size: string;

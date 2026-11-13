@@ -16,15 +16,21 @@ import {
   processWalletTopupEvent,
   listPendingWalletTopupInvoices,
 } from "@urbanmag/core";
-import { ApiPay, type Mode } from "./apipay.js";
+import { configuredApiPay } from "./apipay.js";
 import { walletInvoiceStatus } from "./wallet-status.js";
+import { availableJobTypes } from "./job-types.js";
 
-const mode = (process.env.APIPAY_MODE || "mock") as Mode;
-const api = new ApiPay(mode);
+const { mode, api } = configuredApiPay(
+  process.env.APIPAY_MODE || "mock",
+  process.env.APIPAY_API_KEY || "",
+  process.env.APP_ENV,
+);
+if (!api) console.warn("ApiPay is not configured; payment jobs are paused");
 const workerId = randomUUID();
 const smtp = process.env.SMTP_URL
   ? nodemailer.createTransport(process.env.SMTP_URL)
   : null;
+const jobTypes = availableJobTypes(Boolean(api), Boolean(smtp && process.env.MAIL_FROM));
 let stopped = false;
 process.on("SIGTERM", () => {
   stopped = true;
@@ -35,6 +41,7 @@ process.on("SIGINT", () => {
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 async function handle(job: Awaited<ReturnType<typeof claimJob>> & {}) {
   if (job.type === "create_invoice") {
+    if (!api) throw new Error("ApiPay is not configured");
     const order = await getInvoiceOrder(String(job.payload.orderId));
     if (!order) throw new Error("Order unavailable");
     if (order.environment !== mode)
@@ -47,6 +54,7 @@ async function handle(job: Awaited<ReturnType<typeof claimJob>> & {}) {
       amount: order.total,
     });
   } else if (job.type === "create_wallet_topup_invoice") {
+    if (!api) throw new Error("ApiPay is not configured");
     const topup = await getWalletTopupInvoice(String(job.payload.topupId));
     if (!topup) return;
     if (topup.environment !== mode)
@@ -72,7 +80,7 @@ async function handle(job: Awaited<ReturnType<typeof claimJob>> & {}) {
 }
 async function reconcile() {
   await expireReservations();
-  if (mode === "mock") return;
+  if (!api || mode === "mock") return;
   for (const invoice of await listPendingWalletTopupInvoices()) {
     if (invoice.environment !== mode) continue;
     try {
@@ -143,7 +151,12 @@ while (!stopped) {
       await reconcile();
       nextReconcile = Date.now() + 60000;
     }
-    const job = await claimJob(workerId);
+    // Only claim jobs whose integration is configured, preserving retry counts.
+    if (!jobTypes.length) {
+      await pause(2000);
+      continue;
+    }
+    const job = await claimJob(workerId, jobTypes);
     if (!job) {
       await pause(2000);
       continue;

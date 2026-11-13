@@ -93,8 +93,8 @@ export function pickupHours(
 
 const cartStore = createCartStore({
   read: () => request<Cart>("/api/cart", { cache: "no-store" }),
-  mutate: ({ variantId, quantity, method }) =>
-    post<Cart>("/api/cart", { variantId, quantity }, method),
+  mutate: ({ variantId, productId, selectVariantId, quantity, method }) =>
+    post<Cart>("/api/cart", { variantId, productId, selectVariantId, quantity }, method),
 });
 let listening = false;
 function listenForCartChanges() {
@@ -132,7 +132,12 @@ export function optimisticAddToCart(
   listenForCartChanges();
   return cartStore.add(product, variant, quantity);
 }
+export function optimisticAddProductToCart(product: Product, quantity = 1) {
+  listenForCartChanges();
+  return cartStore.addProduct(product, quantity);
+}
 export const optimisticCartQuantity = cartStore.setQuantity;
+export const optimisticCartSize = cartStore.selectSize;
 export const awaitCartMutations = () => cartStore.settled();
 export function cartChanged() {
   listenForCartChanges();

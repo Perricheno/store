@@ -1,0 +1,6 @@
+.sizeRow { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 10px 0; }
+.sizeField { display: grid; gap: 7px; font-size: 13px; }
+.sizeField select { width: min(100%, 230px); max-width: 100%; min-height: 44px; padding: 8px 32px 8px 10px; border: 1px solid #d7d7d7; border-radius: 4px; background: #fff; color: #151515; font: inherit; }
+.sizeField select:focus-visible { outline: 2px solid #151515; outline-offset: 2px; }
+.warning { display: flex; align-items: center; gap: 7px; color: #151515; font-size: 13px; line-height: 1.4; }
+.warningIcon { display: inline-flex; flex: 0 0 18px; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: #f5cb36; color: #151515; font-size: 12px; font-weight: 800; }

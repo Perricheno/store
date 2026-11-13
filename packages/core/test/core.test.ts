@@ -398,6 +398,26 @@ test("jobs are claimed exclusively and retries preserve encrypted payload", asyn
   assert.equal(row.last_error, "retryable");
 });
 
+test("job type filtering preserves attempts for unavailable integrations", async () => {
+  const db = await database();
+  await db.query("INSERT INTO jobs(id,type,payload,status,available_at,attempts,locked_at) VALUES ('filter-payment','create_invoice','{}','pending','2000-01-01',0,NULL), ('filter-stale','create_wallet_topup_invoice','{}','running','2000-01-01',1,'2000-01-01'), ('filter-mail','send_mail','{}','pending','2000-01-01',0,NULL)");
+  try {
+    assert.equal(await core.claimJob('filter-worker', []), null);
+    const mail = await core.claimJob('filter-worker', ['send_mail']);
+    assert.equal(mail?.id, 'filter-mail');
+    const rows = await db.query("SELECT id,status,attempts FROM jobs WHERE id=ANY($1::text[]) ORDER BY id", [['filter-payment', 'filter-stale']]);
+    assert.deepEqual(rows.map(({ id, status, attempts }) => ({ id, status, attempts })), [
+      { id: 'filter-payment', status: 'pending', attempts: 0 },
+      { id: 'filter-stale', status: 'running', attempts: 1 },
+    ]);
+    const stale = await core.claimJob('filter-worker', ['create_wallet_topup_invoice']);
+    assert.equal(stale?.id, 'filter-stale');
+    assert.equal(stale?.attempts, 2);
+  } finally {
+    await db.query("DELETE FROM jobs WHERE id=ANY($1::text[])", [['filter-payment', 'filter-stale', 'filter-mail']]);
+  }
+});
+
 test("temporary account claims are single use and reset revokes sessions", async () => {
   const rows = await (
     await database()

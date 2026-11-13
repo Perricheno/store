@@ -44,7 +44,10 @@ test("500-piece catalog renders one bounded page and appends without duplicates"
     ),
   );
   expect(new Set(hrefs).size).toBe(48);
-  expect(routePrefetches).toEqual([]);
+  // Warm only the small main navigation; product pages must not flood prefetch.
+  const prefetched = routePrefetches.map(value => new URL(value));
+  expect(prefetched.filter(url => !["/ru", "/ru/cart", "/ru/account", "/ru/favorites"].includes(url.pathname)).map(url => url.pathname)).toEqual([]);
+  expect(new Set(prefetched.map(url => url.pathname + (url.searchParams.get("gender") || ""))).size).toBeLessThanOrEqual(6);
   await expect(page.getByRole("status")).toContainText(`48 из ${first.total}`);
 });
 

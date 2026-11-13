@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getSettings } from "@urbanmag/core";
+import { shopSettings as getSettings } from "@/lib/server-settings";
 import { StoreInformation } from "@/components/shop-information";
 import { isLocale } from "@/lib/config";
 import { dictionary } from "@/lib/i18n";

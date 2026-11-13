@@ -7,22 +7,16 @@ import {
   Heart,
   MagnifyingGlass,
   Plus,
-  SlidersHorizontal,
-  X,
-  CoatHanger,
-  SquaresFour,
 } from "@phosphor-icons/react";
 import { dictionary, money, type Locale } from "../lib/i18n";
 import type { Product } from "@urbanmag/core";
 import {
-  CATEGORIES,
   CATALOG_PAGE_SIZE,
   categoryName,
   catalogQuery,
   type CatalogFilterState,
 } from "../lib/categories";
 import s from "./shop.module.css";
-import { categoryIcons } from "../lib/category-icons";
 import {
   type Common,
   type CatalogPagination,
@@ -32,13 +26,14 @@ import { localized, request, post } from "./shop-client";
 import { ProductMedia } from "./shop-media";
 import { BuyerHistory } from "./shop-buyer-history";
 import { catalogCopy } from "./shop-copy";
-import { ShopShell } from "./shop-shell";
 import {
   ProductPromotion,
   ProductQuickAdd,
   ProductQuickAddProvider,
 } from "./shop-product-features";
 import { ErrorNotice, Empty } from "./shop-ui";
+import { ShopFilters } from "./shop-filters";
+import { catalogFiltersFromLocation, catalogLocation } from "../lib/catalog-filter-controls";
 
 export function StorePromotions({ locale, settings }: Common) {
   const t = dictionary(locale);
@@ -154,7 +149,6 @@ export function Storefront({
   locale,
   products: initialProducts,
   settings,
-  initialCart,
   favoritesOnly = false,
   initialCategory = "all",
   initialPagination,
@@ -193,16 +187,7 @@ export function Storefront({
         available: false,
       },
   );
-  const {
-    gender,
-    category,
-    q,
-    sort,
-    size,
-    minPrice: min,
-    maxPrice: max,
-    available,
-  } = filters;
+  const { gender, category } = filters;
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]),
     [favorites, setFavorites] = useState<Product[]>([]),
     [loading, setLoading] = useState(favoritesOnly),
@@ -213,8 +198,8 @@ export function Storefront({
     [moreError, setMoreError] = useState(false),
     [retry, setRetry] = useState(0);
   const favoriteLock = useRef(false);
-  const dialog = useRef<HTMLDialogElement>(null),
-    generation = useRef(0),
+  const historyAction = useRef<"search" | "filter">("filter");
+  const generation = useRef(0),
     moreController = useRef<AbortController | null>(null),
     loaded = useRef(false),
     clientFiltersChanged = useRef(false),
@@ -253,12 +238,25 @@ export function Storefront({
       },
     );
   }, [initialFilters, initialProducts, initialPagination]);
-  function setFilter<K extends keyof CatalogFilterState>(
-    key: K,
-    value: CatalogFilterState[K],
-  ) {
-    setFilters((previous) => ({ ...previous, [key]: value }));
+  function changeFilters(next: CatalogFilterState, search = false) {
+    const target = catalogLocation(locale, next, initialCategory);
+    if (window.location.pathname + window.location.search !== target) {
+      if (search && historyAction.current === "search")
+        window.history.replaceState(null, "", target);
+      else window.history.pushState(null, "", target);
+    }
+    historyAction.current = search ? "search" : "filter";
+    setFilters(next);
   }
+  useEffect(() => {
+    if (favoritesOnly) return;
+    function restoreFilters() {
+      historyAction.current = "filter";
+      setFilters(catalogFiltersFromLocation(window.location.pathname, window.location.search));
+    }
+    window.addEventListener("popstate", restoreFilters);
+    return () => window.removeEventListener("popstate", restoreFilters);
+  }, [favoritesOnly]);
   useEffect(() => {
     request<Product[] | { products: Product[] }>("/api/favorites")
       .then((data) => {
@@ -282,14 +280,7 @@ export function Storefront({
     setMoreLoading(false);
     setMoreError(false);
     loaded.current = true;
-    const params = new URLSearchParams(query),
-      urlParams = new URLSearchParams(query);
-    if (category === initialCategory && initialCategory !== "all")
-      urlParams.delete("category");
-    const suffix = urlParams.toString() ? `?${urlParams}` : "";
-    const target = `/${locale}${category === initialCategory && initialCategory !== "all" ? `/c/${initialCategory}` : ""}${suffix}`;
-    if (window.location.pathname + window.location.search !== target)
-      window.history.replaceState(null, "", target);
+    const params = new URLSearchParams(query);
     if (
       !clientFiltersChanged.current &&
       initialPagination &&
@@ -333,7 +324,7 @@ export function Storefront({
           )
             setLoading(false);
         });
-    }, 200);
+    }, historyAction.current === "search" ? 200 : 0);
     return () => {
       clearTimeout(timer);
       controller.abort();
@@ -418,46 +409,19 @@ export function Storefront({
     [favoriteReady],
   );
   function reset() {
-    setFilters({
-      category: "all",
-      gender: "",
-      q: "",
-      sort: "newest",
-      size: "",
-      minPrice: "",
-      maxPrice: "",
-      available: false,
+    changeFilters({
+      category: "all", gender: "", q: "", sort: filters.sort,
+      size: "", minPrice: "", maxPrice: "", available: false,
     });
   }
   const list = favoritesOnly ? favorites : products,
     total = favoritesOnly ? favorites.length : pagination.total;
-  const activeCount = [size, min, max, available].filter(Boolean).length;
-  const sizes = [
-    "XS",
-    "S",
-    "M",
-    "L",
-    "XL",
-    "XXL",
-    "36",
-    "37",
-    "38",
-    "39",
-    "40",
-    "41",
-    "42",
-    "43",
-    "44",
-    "45",
-    "46",
-    "ONE SIZE",
-  ];
   const heading = favoritesOnly
     ? t.favorites
     : categoryName(locale, category) ||
       (gender === "men" ? t.men : gender === "women" ? t.women : t.new);
   return (
-    <ShopShell locale={locale} settings={settings} initialCart={initialCart}>
+    <>
       <ProductQuickAddProvider>
         {!favoritesOnly && (
           <StorePromotions locale={locale} settings={settings} />
@@ -474,98 +438,13 @@ export function Storefront({
             </div>
           </div>
           {!favoritesOnly && (
-            <>
-              <div className={s.genderTabs} role="group" aria-label={t.catalog}>
-                {[
-                  ["", t.new],
-                  ["men", t.men],
-                  ["women", t.women],
-                ].map(([value, label]) => (
-                  <button
-                    key={value}
-                    className={gender === value ? s.activeTab : ""}
-                    onClick={() => setFilter("gender", value)}
-                  >
-                    {label}
-                    <ArrowRight size={18} />
-                  </button>
-                ))}
-              </div>
-              <div className={s.categoryRow}>
-                <nav className={s.categoryScroll} aria-label={copy.categories}>
-                  <button
-                    className={category === "all" ? s.activeChip : ""}
-                    onClick={() => setFilter("category", "all")}
-                    aria-pressed={category === "all"}
-                  >
-                    <SquaresFour size={20} weight="bold" aria-hidden="true" />
-                    {t.all}
-                  </button>
-                  {CATEGORIES.map((c) => {
-                    const CategoryIcon = categoryIcons[c.id] || CoatHanger;
-                    return (
-                      <button
-                        key={c.id}
-                        className={category === c.id ? s.activeChip : ""}
-                        onClick={() => setFilter("category", c.id)}
-                        aria-pressed={category === c.id}
-                      >
-                        <CategoryIcon
-                          size={20}
-                          weight="bold"
-                          aria-hidden="true"
-                        />
-                        {c.names[locale]}
-                      </button>
-                    );
-                  })}
-                </nav>
-                <button
-                  className={s.filterButton}
-                  onClick={() => dialog.current?.showModal()}
-                >
-                  <SlidersHorizontal size={19} weight="bold" />
-                  {t.filters}
-                  {activeCount > 0 && <span>{activeCount}</span>}
-                </button>
-              </div>
-              <div className={s.catalogUtilities}>
-                <form
-                  className={s.catalogSearch}
-                  onSubmit={(e) => e.preventDefault()}
-                >
-                  <MagnifyingGlass size={19} weight="bold" />
-                  <input
-                    aria-label={t.search}
-                    value={q}
-                    onChange={(e) => setFilter("q", e.target.value)}
-                    placeholder={t.searchPlaceholder}
-                  />
-                  {q && (
-                    <button
-                      type="button"
-                      onClick={() => setFilter("q", "")}
-                      aria-label={t.reset}
-                    >
-                      <X size={18} />
-                    </button>
-                  )}
-                </form>
-                <span className={s.count} aria-live="polite">
-                  {loading ? t.loading : `${total} ${t.pieces}`}
-                </span>
-                <select
-                  aria-label={t.sort}
-                  className={s.sort}
-                  value={sort}
-                  onChange={(e) => setFilter("sort", e.target.value)}
-                >
-                  <option value="newest">{t.newest}</option>
-                  <option value="price-asc">{t.priceAsc}</option>
-                  <option value="price-desc">{t.priceDesc}</option>
-                </select>
-              </div>
-            </>
+            <ShopFilters
+              locale={locale}
+              filters={filters}
+              total={total}
+              loading={loading}
+              onChange={changeFilters}
+            />
           )}
           {error && (
             <ErrorNotice
@@ -637,91 +516,7 @@ export function Storefront({
           )}
         </section>
         {!favoritesOnly && <BuyerHistory locale={locale} controls={false} />}
-        <dialog
-          className={s.dialog}
-          ref={dialog}
-          aria-label={t.filters}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) dialog.current?.close();
-          }}
-        >
-          <div className={s.dialogInner}>
-            <div className={s.dialogHead}>
-              <h2>{t.filters}</h2>
-              <button
-                className={s.iconButton}
-                aria-label={t.close}
-                onClick={() => dialog.current?.close()}
-              >
-                <X size={24} weight="bold" />
-              </button>
-            </div>
-            <fieldset className={s.filterGroup}>
-              <legend>{t.size}</legend>
-              <div className={s.sizeRow}>
-                {sizes.map((value) => (
-                  <button
-                    className={`${s.sizeButton} ${size === value ? s.selectedSize : ""}`}
-                    key={value}
-                    onClick={() =>
-                      setFilter("size", size === value ? "" : value)
-                    }
-                    aria-pressed={size === value}
-                  >
-                    {value}
-                  </button>
-                ))}
-              </div>
-            </fieldset>
-            <fieldset className={s.filterGroup}>
-              <legend>{t.price}</legend>
-              <div className={s.priceInputs}>
-                <label>
-                  {t.from}
-                  <input
-                    inputMode="numeric"
-                    type="number"
-                    min="0"
-                    value={min}
-                    onChange={(e) => setFilter("minPrice", e.target.value)}
-                  />
-                </label>
-                <span>—</span>
-                <label>
-                  {t.to}
-                  <input
-                    inputMode="numeric"
-                    type="number"
-                    min="0"
-                    value={max}
-                    onChange={(e) => setFilter("maxPrice", e.target.value)}
-                  />
-                </label>
-              </div>
-            </fieldset>
-            <label className={s.checkbox}>
-              <input
-                type="checkbox"
-                checked={available}
-                onChange={(e) => setFilter("available", e.target.checked)}
-              />
-              <span>{t.available}</span>
-            </label>
-            <div className={s.dialogBottom}>
-              <button
-                className={s.primaryButton}
-                onClick={() => dialog.current?.close()}
-              >
-                {t.apply}
-                <ArrowRight size={20} />
-              </button>
-              <button className={s.textButton} onClick={reset}>
-                {t.reset}
-              </button>
-            </div>
-          </div>
-        </dialog>
       </ProductQuickAddProvider>
-    </ShopShell>
+    </>
   );
 }

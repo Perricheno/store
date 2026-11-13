@@ -12,7 +12,6 @@ import type { Wallet, WalletTopup } from "@urbanmag/core";
 import { dictionary, money } from "../lib/i18n";
 import { type Common } from "./shop-types";
 import { request } from "./shop-client";
-import { ShopShell } from "./shop-shell";
 import { ErrorNotice, PageTitle } from "./shop-ui";
 import { walletCopy, walletError } from "./wallet-copy";
 import s from "./shop.module.css";
@@ -217,7 +216,7 @@ export function WalletView({ locale, settings, initialCart }: Common) {
       { dateStyle: "medium", timeStyle: "short" },
     ).format(new Date(value));
   return (
-    <ShopShell locale={locale} settings={settings} initialCart={initialCart}>
+    <>
       <section className={s.innerPage}>
         <PageTitle title={copy.title} locale={locale} />
         <div className={w.links}>
@@ -459,6 +458,6 @@ export function WalletView({ locale, settings, initialCart }: Common) {
           )
         )}
       </section>
-    </ShopShell>
+    </>
   );
 }

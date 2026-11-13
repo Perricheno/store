@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
-import { getCatalogPage, getSettings } from "@urbanmag/core";
+import { getCatalogPage } from "@urbanmag/core";
+import { shopSettings as getSettings } from "@/lib/server-settings";
 import { Storefront } from "@/components/shop-storefront";
 import { isLocale } from "@/lib/config";
 import { pageMetadata } from "@/lib/seo";

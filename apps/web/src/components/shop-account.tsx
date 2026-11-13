@@ -7,7 +7,6 @@ import { dictionary } from "../lib/i18n";
 import s from "./shop.module.css";
 import { type Common, type Order } from "./shop-types";
 import { request, post } from "./shop-client";
-import { ShopShell } from "./shop-shell";
 import { BuyerHistory } from "./shop-buyer-history";
 import { BuyerHelp } from "./shop-buyer-help";
 import { BuyerOrders } from "./shop-buyer-orders";
@@ -110,7 +109,7 @@ export function AccountView({ locale, settings, initialCart }: Common) {
       user.requiresPasswordChange ||
       user.temporaryPassword);
   return (
-    <ShopShell locale={locale} settings={settings} initialCart={initialCart}>
+    <>
       <section className={s.innerPage}>
         <PageTitle title={t.account} locale={locale} />
         {loading ? (
@@ -231,6 +230,6 @@ export function AccountView({ locale, settings, initialCart }: Common) {
         {!loading && !mustChange && <div id="history"><BuyerHistory locale={locale} /></div>}
         {!loading && <BuyerHelp locale={locale} settings={settings} />}
       </section>
-    </ShopShell>
+    </>
   );
 }

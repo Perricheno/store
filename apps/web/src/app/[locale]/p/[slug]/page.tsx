@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { cache } from "react";
-import { getProduct, getSettings, publicProduct } from "@urbanmag/core";
+import { getProduct, publicProduct } from "@urbanmag/core";
+import { shopSettings as getSettings } from "@/lib/server-settings";
 import { ProductDetail } from "@/components/shop-product-detail";
 import { isLocale, shopOrigin } from "@/lib/config";
 import { JsonLd, pageMetadata } from "@/lib/seo";

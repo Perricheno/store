@@ -1,6 +1,18 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ApiPay } from "./apipay.js";
+import { ApiPay, configuredApiPay } from "./apipay.js";
+
+test("missing provider credentials pause queue processing without relaxing mode validation", () => {
+  assert.deepEqual(configuredApiPay("production", "", "production"), {
+    mode: "production",
+    api: null,
+  });
+  assert.equal(configuredApiPay("sandbox", "  ", "development").api, null);
+  assert.throws(() => configuredApiPay("invalid", "", "production"), /Invalid APIPAY_MODE/);
+  assert.throws(() => configuredApiPay("mock", "", "production"), /forbidden in production/);
+  assert.throws(() => new ApiPay("production", ""), /APIPAY_API_KEY is required/);
+  assert.ok(configuredApiPay("sandbox", "key", "development").api);
+});
 
 test("sandbox mode is checked before creating an idempotent whole-tenge invoice", async () => {
   const calls: { url: string; init?: RequestInit }[] = [];

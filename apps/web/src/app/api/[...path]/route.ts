@@ -108,15 +108,15 @@ async function handler(
       if (method === "GET")
         return json(publicCart(await core.getCart(visitor)));
       const input = await body(request);
-      const quantity =
-        method === "POST"
-          ? ((await core.getCart(visitor)).items.find(
-              (i) => i.variantId === input.variantId,
-            )?.quantity || 0) + Number(input.quantity)
-          : Number(input.quantity);
-      return json(
-        publicCart(await core.updateCart(visitor, input.variantId, quantity)),
-      );
+      if (method !== "POST" && method !== "PATCH")
+        throw new core.CoreError(405, "METHOD_NOT_ALLOWED", "Метод не поддерживается");
+      return json(publicCart(await core.mutateCart(visitor, {
+        variantId: input.variantId ?? undefined,
+        productId: input.productId ?? undefined,
+        selectVariantId: input.selectVariantId,
+        quantity: Number(input.quantity),
+        mode: method === "POST" ? "add" : "set",
+      })));
     }
     if (path === "favorites") {
       const visitor = await visitorId();

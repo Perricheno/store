@@ -47,10 +47,12 @@ export function Recovery({
   locale = "ru",
   claim = false,
   staff = false,
+  embedded = false,
 }: {
   locale?: Locale;
   claim?: boolean;
   staff?: boolean;
+  embedded?: boolean;
 }) {
   const t = copy[locale];
   const [token, setToken] = useState("");
@@ -87,8 +89,9 @@ export function Recovery({
       setBusy(false);
     }
   }
+  const FormContainer = staff ? "main" : "section";
   const form = (
-    <main className={s.center}>
+    <FormContainer className={s.center}>
       <p className={s.eyebrow}>Urbanmag</p>
       <h1>{t.title}</h1>
       {done ? (
@@ -140,7 +143,7 @@ export function Recovery({
           </button>
         </form>
       )}
-    </main>
+    </FormContainer>
   );
-  return staff ? form : <ShopShell locale={locale}>{form}</ShopShell>;
+  return staff || embedded ? form : <ShopShell locale={locale}>{form}</ShopShell>;
 }

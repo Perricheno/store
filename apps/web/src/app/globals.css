@@ -15,7 +15,7 @@ body {
   margin: 0;
   background: var(--white);
   color: var(--black);
-  font-family: var(--font-inter), "Inter Variable", Inter, Arial, sans-serif;
+  font-family: var(--font-inter), var(--font-inter-cyrillic), var(--font-inter-cyrillic-extended), var(--font-inter-currency), var(--font-inter-latin-extended), Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 button,

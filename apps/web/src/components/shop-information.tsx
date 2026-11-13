@@ -4,7 +4,7 @@ import { dictionary } from "../lib/i18n";
 import s from "./shop.module.css";
 import { type Common } from "./shop-types";
 import { localized } from "./shop-client";
-import { ShopShell, ContactDetails } from "./shop-shell";
+import { ContactDetails } from "./shop-shell";
 
 export function StoreInformation({
   locale,
@@ -27,7 +27,7 @@ export function StoreInformation({
       ? ""
       : localized(settings?.contentPages?.[infoPage], locale).trim();
   return (
-    <ShopShell locale={locale} settings={settings}>
+    <>
       <article className={s.informationPage}>
         <h1>
           {title}
@@ -39,6 +39,6 @@ export function StoreInformation({
           body && <div className={s.informationBody}>{body}</div>
         )}
       </article>
-    </ShopShell>
+    </>
   );
 }

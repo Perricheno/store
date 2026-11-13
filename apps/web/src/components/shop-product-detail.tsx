@@ -24,7 +24,6 @@ import {
   optimisticAddToCart,
   pickupAddress,
 } from "./shop-client";
-import { ShopShell } from "./shop-shell";
 import { ProductSharing } from "./shop-product-sharing";
 import { ProductMedia } from "./shop-media";
 import { ErrorNotice } from "./shop-ui";
@@ -124,7 +123,7 @@ export function ProductDetail({
     }
   }
   return (
-    <ShopShell locale={locale} settings={settings} initialCart={initialCart}>
+    <>
       <div className={s.detailBreadcrumb}>
         <Link prefetch={false} href={`/${locale}`}>
           <ArrowLeft size={18} weight="bold" />
@@ -325,6 +324,6 @@ export function ProductDetail({
           {added ? <Check size={20} weight="bold" /> : <Plus size={20} />}
         </button>
       </div>
-    </ShopShell>
+    </>
   );
 }

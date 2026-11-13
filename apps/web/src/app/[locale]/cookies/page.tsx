@@ -1,7 +1,5 @@
 import { notFound } from "next/navigation";
 import { isLocale } from "@/lib/config";
-import { ShopShell } from "@/components/shop-shell";
-import { getSettings } from "@urbanmag/core";
 import s from "@/components/shop.module.css";
 export const dynamic = "force-dynamic";
 
@@ -51,9 +49,8 @@ export default async function Page({
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
   const t = content[locale];
-  const settings = await getSettings();
   return (
-    <ShopShell locale={locale} settings={settings}>
+    <>
       <article className={s.informationPage}>
         <h1>
           {t.title}
@@ -69,6 +66,6 @@ export default async function Page({
           <p>{t.note}</p>
         </div>
       </article>
-    </ShopShell>
+    </>
   );
 }

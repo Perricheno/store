@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import Link, { useLinkStatus } from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, ViewTransition, type ReactNode } from "react";
 import {
   ArrowRight,
@@ -17,17 +17,25 @@ import { dictionary, type Locale } from "../lib/i18n";
 import { InstallApp } from "./install-app";
 import { StoreAnnouncement } from "./shop-announcement";
 import s from "./shop.module.css";
+import navigation from "./shop-navigation.module.css";
 import { type Common } from "./shop-types";
 import { useCart, localized, pickupAddress, pickupHours } from "./shop-client";
+
+function NavigationHint() {
+  const { pending } = useLinkStatus();
+  return <span className={navigation.pending} data-navigation-pending={String(pending)} aria-hidden="true" />;
+}
 
 export function StoreHeader({ locale, initialCart }: Common) {
   const t = dictionary(locale);
   const path = usePathname();
+  const router = useRouter();
+  const search = useSearchParams();
   const [q, setQ] = useState("");
   const { cart } = useCart(initialCart);
   useEffect(() => {
     setQ(new URLSearchParams(window.location.search).get("q") || "");
-  }, [path]);
+  }, [path, search]);
   return (
     <>
       <a className={s.skip} href="#main">
@@ -36,7 +44,7 @@ export function StoreHeader({ locale, initialCart }: Common) {
       <header className={s.header}>
         <div className={s.headerInner}>
           <Link
-            prefetch={false}
+            prefetch={true}
             className={s.logo}
             href={`/${locale}`}
             aria-label="URBANMAG"
@@ -49,17 +57,22 @@ export function StoreHeader({ locale, initialCart }: Common) {
             </span>
           </Link>
           <nav className={s.desktopNav} aria-label={t.catalog}>
-            <Link prefetch={false} href={`/${locale}`}>
+            <Link prefetch={true} href={`/${locale}`}>
               {t.new}
             </Link>
-            <Link prefetch={false} href={`/${locale}?gender=men`}>
+            <Link prefetch={true} href={`/${locale}?gender=men`}>
               {t.men}
             </Link>
-            <Link prefetch={false} href={`/${locale}?gender=women`}>
+            <Link prefetch={true} href={`/${locale}?gender=women`}>
               {t.women}
             </Link>
           </nav>
-          <form className={s.headerSearch} action={`/${locale}`}>
+          <form className={s.headerSearch} action={`/${locale}`} onSubmit={(event) => {
+            event.preventDefault();
+            const query = new URLSearchParams();
+            if (q.trim()) query.set("q", q.trim());
+            router.push(`/${locale}${query.size ? `?${query}` : ""}`);
+          }}>
             <MagnifyingGlass size={20} weight="bold" />
             <input
               aria-label={t.search}
@@ -78,19 +91,15 @@ export function StoreHeader({ locale, initialCart }: Common) {
               aria-label={t.language}
             >
               {(["ru", "kk", "en"] as Locale[]).map((l) => (
-                <a
+                <Link
                   key={l}
-                  href={path.replace(/^\/(ru|kk|en)(?=\/|\?|$)/, `/${l}`)}
+                  prefetch={false}
+                  href={`${path.replace(/^\/(ru|kk|en)(?=\/|\?|$)/, `/${l}`)}${search.size ? `?${search}` : ""}`}
                   hrefLang={l}
-                  onClick={(e) => {
-                    e.currentTarget.href = (
-                      window.location.pathname + window.location.search
-                    ).replace(/^\/(ru|kk|en)(?=\/|\?|$)/, `/${l}`);
-                  }}
                   aria-current={locale === l ? "true" : undefined}
                 >
                   {l.toUpperCase()}
-                </a>
+                </Link>
               ))}
             </div>
             <div className={s.languageControl}>
@@ -101,12 +110,12 @@ export function StoreHeader({ locale, initialCart }: Common) {
                 aria-label={t.language}
                 value={locale}
                 onChange={(event) => {
-                  window.location.href = (
+                  router.push((
                     window.location.pathname + window.location.search
                   ).replace(
                     /^\/(ru|kk|en)(?=\/|\?|$)/,
                     `/${event.target.value}`,
-                  );
+                  ));
                 }}
               >
                 <option value="ru">RU</option>
@@ -115,7 +124,7 @@ export function StoreHeader({ locale, initialCart }: Common) {
               </select>
             </div>
             <Link
-              prefetch={false}
+              prefetch={true}
               href={`/${locale}/favorites`}
               className={s.iconButton}
               aria-label={t.favorites}
@@ -123,7 +132,7 @@ export function StoreHeader({ locale, initialCart }: Common) {
               <Heart size={23} weight="bold" />
             </Link>
             <Link
-              prefetch={false}
+              prefetch={true}
               href={`/${locale}/account`}
               className={`${s.iconButton} ${s.accountIcon}`}
               aria-label={t.account}
@@ -131,7 +140,7 @@ export function StoreHeader({ locale, initialCart }: Common) {
               <User size={23} weight="bold" />
             </Link>
             <Link
-              prefetch={false}
+              prefetch={true}
               href={`/${locale}/cart`}
               className={s.iconButton}
               aria-label={`${t.cart}${cart.items.length ? ` (${cart.items.reduce((n, i) => n + i.quantity, 0)})` : ""}`}
@@ -179,7 +188,7 @@ export function StoreHeader({ locale, initialCart }: Common) {
           <Link
             key={href}
             href={href}
-            prefetch={false}
+            prefetch={true}
             aria-current={active ? "page" : undefined}
             aria-label={
               href.endsWith("/cart") && cart.items.length
@@ -196,6 +205,7 @@ export function StoreHeader({ locale, initialCart }: Common) {
               )}
             </span>
             <span>{href.endsWith("/account") ? t.profile : label}</span>
+            <NavigationHint />
           </Link>
         ))}
       </nav>
@@ -285,7 +295,7 @@ export function ShopShell({
   settings,
   initialCart,
 }: Common & { children: ReactNode }) {
-  const path = usePathname();
+  useEffect(() => { document.documentElement.lang = locale; }, [locale]);
   return (
     <div className={s.shop}>
       <StoreAnnouncement locale={locale} settings={settings} />
@@ -293,11 +303,12 @@ export function ShopShell({
       <ViewTransition
         name="shop-content"
         default="none"
+        update="urbanmag-route"
         share="urbanmag-route"
         enter="urbanmag-route"
         exit="urbanmag-route"
       >
-        <main id="main" className={s.main} key={path}>
+        <main id="main" className={s.main}>
           {children}
         </main>
       </ViewTransition>

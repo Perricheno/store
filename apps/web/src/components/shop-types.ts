@@ -37,7 +37,7 @@ export type Common = {
 export type Cart = {
   id?: string;
   items: {
-    variantId: string;
+    variantId: string | null;
     quantity: number;
     size: string;
     product: Product;

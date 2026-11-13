@@ -54,4 +54,8 @@ INSERT INTO schema_migrations(version) VALUES (4) ON CONFLICT DO NOTHING;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS article text;
 ALTER TABLE variants ADD COLUMN IF NOT EXISTS barcode text;
 INSERT INTO schema_migrations(version) VALUES (5) ON CONFLICT DO NOTHING;
+CREATE TABLE IF NOT EXISTS cart_pending_sizes (
+ visitor_id text NOT NULL,product_id text NOT NULL REFERENCES products(id),
+ quantity integer NOT NULL CHECK(quantity BETWEEN 1 AND 50),PRIMARY KEY(visitor_id,product_id));
+INSERT INTO schema_migrations(version) VALUES (6) ON CONFLICT DO NOTHING;
 `;

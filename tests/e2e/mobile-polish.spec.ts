@@ -5,21 +5,18 @@ test("mobile bag announces its quantity after quick add and reload", async ({
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/ru?q=City");
-  await page
-    .getByRole("button", {
-      name: "Добавить в корзину: Футболка City",
-      exact: true,
-    })
-    .click();
   const saved = page.waitForResponse(
     (response) =>
       response.url().endsWith("/api/cart") &&
       response.request().method() === "POST",
   );
   await page
-    .getByRole("dialog", { name: "Выберите размер" })
-    .getByRole("button", { name: "M", exact: true })
+    .getByRole("button", {
+      name: "Добавить в корзину: Футболка City",
+      exact: true,
+    })
     .click();
+  await expect(page.getByRole("dialog", { name: "Выберите размер" })).toHaveCount(0);
   expect((await saved).ok()).toBeTruthy();
   const bag = page
     .locator('nav[class*="bottomNav"]')
@@ -108,8 +105,8 @@ test("mobile controls and category gleam retain their intended styles", async ({
     const page = await context.newPage();
     await page.goto("/ru");
     const nav = page.locator('nav[class*="bottomNav"]');
-    await expect(nav).toHaveCSS("backdrop-filter", "blur(18px)");
-    await expect(nav).toHaveCSS("background-color", "rgba(255, 255, 255, 0.8)");
+    await expect(nav).toHaveCSS("backdrop-filter", "blur(24px)");
+    await expect(nav).toHaveCSS("background-color", "rgba(255, 255, 255, 0.64)");
     await expect(
       nav.getByRole("link", { name: "Корзина", exact: true }),
     ).toHaveCSS("touch-action", "manipulation");

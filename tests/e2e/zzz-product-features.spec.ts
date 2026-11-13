@@ -135,21 +135,13 @@ test("product editor persists hidden characteristics and translated promotion", 
   }
 });
 
-async function chooseVariant(page: Page, product: Product) {
+async function quickAdd(page: Page, product: Product) {
   const button = page.getByRole("button", {
     name: `Добавить в корзину: ${product.names.ru}`,
     exact: true,
   });
   await button.click();
-  const available = product.sizes.filter((size) => size.available > 0);
-  if (available.length > 1) {
-    const dialog = page.getByRole("dialog", { name: "Выберите размер" });
-    await expect(dialog).toBeVisible();
-    await dialog
-      .getByRole("button", { name: new RegExp(`^${available[0].size}`) })
-      .first()
-      .click();
-  }
+  await expect(page.getByRole("dialog", { name: "Выберите размер" })).toHaveCount(0);
 }
 
 for (const shouldFail of [false, true]) {
@@ -187,7 +179,7 @@ for (const shouldFail of [false, true]) {
       else await route.continue();
     });
     try {
-      await chooseVariant(page, product);
+      await quickAdd(page, product);
       await requestStarted;
       await expect(
         page.getByRole("link", { name: "Корзина (1)", exact: true }).first(),
@@ -215,6 +207,8 @@ for (const shouldFail of [false, true]) {
         ).toBeVisible();
       } else {
         const cart = await (await page.request.get("/api/cart")).json();
+        expect(cart.items[0].variantId).toBeNull();
+        expect(cart.items[0].product.id).toBe(product.id);
         expect(
           cart.items.reduce(
             (sum: number, item: { quantity: number }) => sum + item.quantity,

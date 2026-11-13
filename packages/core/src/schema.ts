@@ -136,6 +136,16 @@ export const carts = pgTable(
   },
   (t) => [primaryKey({ columns: [t.visitorId, t.variantId] })],
 );
+/** Product-level cart rows awaiting a genuine variant selection. */
+export const cartPendingSizes = pgTable(
+  "cart_pending_sizes",
+  {
+    visitorId: text("visitor_id").notNull(),
+    productId: text("product_id").notNull().references(() => products.id),
+    quantity: integer("quantity").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.visitorId, t.productId] })],
+);
 export const favorites = pgTable(
   "favorites",
   {

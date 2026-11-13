@@ -42,6 +42,9 @@ for (const detail of [false, true]) {
         await add.click();
         await expect(
           page.getByRole("dialog", { name: "Выберите размер" }),
+        ).toHaveCount(0);
+        await expect(
+          page.getByRole("link", { name: "Корзина (1)", exact: true }).first(),
         ).toBeVisible();
       }
     } finally {
@@ -50,3 +53,34 @@ for (const detail of [false, true]) {
     }
   });
 }
+
+test("cart size selection waits for handlers on a slow connection", async ({ page }) => {
+  const { products } = await (await page.request.get("/api/products?q=City")).json();
+  const product = products.find((item: { slug: string }) => item.slug === "city-tee");
+  const added = await page.request.post("/api/cart", {
+    headers: { Origin: "https://localhost:3443" },
+    data: { productId: product.id, quantity: 1 },
+  });
+  expect(added.ok()).toBeTruthy();
+  let release!: () => void;
+  const scripts = new Promise<void>((resolve) => { release = resolve; });
+  await page.route("**/_next/static/**/*.js", async (route) => {
+    await scripts;
+    await route.continue();
+  });
+  try {
+    await page.goto("/ru/cart", { waitUntil: "commit" });
+    const size = page.getByRole("article").getByRole("combobox");
+    await expect(size).toBeVisible();
+    await expect(size).toBeDisabled();
+    release();
+    await expect(size).toBeEnabled();
+    const saved = page.waitForResponse((response) => response.url().endsWith("/api/cart") && response.request().method() === "PATCH");
+    await size.selectOption(product.sizes.find((variant: { available: number }) => variant.available > 0).id);
+    expect((await saved).ok()).toBeTruthy();
+    await expect(size).not.toHaveValue("");
+  } finally {
+    release();
+    await page.unrouteAll({ behavior: "wait" });
+  }
+});

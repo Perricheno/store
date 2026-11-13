@@ -1,0 +1,14 @@
+.pending {
+  position: absolute;
+  bottom: 2px;
+  left: calc(50% - 12px);
+  width: 24px;
+  height: 2px;
+  border-radius: 4px;
+  background: var(--red);
+  opacity: 0;
+  transform: scaleX(.5);
+  transition: opacity 140ms, transform 180ms;
+}
+.pending[data-navigation-pending="true"] { opacity: 1; transform: scaleX(1); }
+@media (prefers-reduced-motion: reduce) { .pending { transition: none; } }

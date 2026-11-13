@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getSettings } from "@urbanmag/core";
+import { shopSettings as getSettings } from "@/lib/server-settings";
 import { CheckoutView } from "@/components/shop-checkout";
 import { isLocale } from "@/lib/config";
 import { initialCart } from "@/lib/server-cart";

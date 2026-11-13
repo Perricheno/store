@@ -107,15 +107,17 @@ test("category buttons have icons and a hidden but keyboard-scrollable rail", as
   expect(await rail.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
 });
 
-test("filter panel hides its scrollbar while allowing keyboard scrolling", async ({
+test("filter panel keeps actions reachable while its content scrolls", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 360, height: 320 });
   await page.goto("/ru");
-  await page.getByRole("button", { name: "Фильтры" }).click();
-  const dialog = page.getByRole("dialog", { name: "Фильтры" });
+  const trigger = page.getByRole("button", { name: "Фильтры", exact: true });
+  await trigger.click();
+  const dialog = page.getByRole("dialog", { name: /^Фильтры/ });
   await expect(dialog).toBeVisible();
-  const style = await dialog.evaluate((el) => ({
+  const body = dialog.getByTestId("filter-scroll");
+  const style = await body.evaluate((el) => ({
     overflow: getComputedStyle(el).overflowY,
     scrollbar: getComputedStyle(el).scrollbarWidth,
     webkit: getComputedStyle(el, "::-webkit-scrollbar").display,
@@ -125,17 +127,21 @@ test("filter panel hides its scrollbar while allowing keyboard scrolling", async
   expect(style.overflow).toMatch(/auto|scroll/);
   expect(style.scrollbar === "none" || style.webkit === "none").toBe(true);
   expect(style.height).toBeGreaterThan(style.client);
-  await dialog.getByRole("button").first().focus();
-  const reset = dialog.getByRole("button", { name: "Сбросить" });
-  for (
-    let i = 0;
-    i < 30 && !(await reset.evaluate((el) => el === document.activeElement));
-    i++
-  ) {
-    await page.keyboard.press("Tab");
-  }
-  await expect(reset).toBeFocused();
-  expect(await dialog.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+  const apply = dialog.getByRole("button", { name: "Показать вещи", exact: true });
+  const before = await apply.boundingBox();
+  expect(before!.y).toBeGreaterThanOrEqual(0);
+  expect(before!.y + before!.height).toBeLessThanOrEqual(320);
+  await dialog.getByRole("checkbox", { name: "Только в наличии" }).focus();
+  expect(await body.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+  const after = await apply.boundingBox();
+  expect(after!.y).toBe(before!.y);
+  await page.keyboard.press("Tab");
+  await expect(dialog.getByRole("button", { name: "Сбросить", exact: true })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(apply).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(trigger).toBeFocused();
 });
 
 test("missing product photos use a large masked category icon", async ({
