@@ -440,6 +440,7 @@ export function Dashboard() {
   const t = dict[lang];
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [pendingLoads, setPendingLoads] = useState(0);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [tab, setTab] = useState("summary");
@@ -491,8 +492,9 @@ export function Dashboard() {
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
-  async function load() {
+  async function load(refreshInsights = true) {
     if (!user || user.mustChangePassword) return;
+    setPendingLoads((count) => count + 1);
     try {
       const [p, o, st, si] = await Promise.all([
         api<Product[]>("staff/products"),
@@ -504,7 +506,7 @@ export function Dashboard() {
       setOrders(o);
       setSettings(st);
       setIntegration(si);
-      setInsightsRevision((revision) => revision + 1);
+      if (refreshInsights) setInsightsRevision((revision) => revision + 1);
       if (user.role === "owner") {
         const [staff, jobRows] = await Promise.all([
           api<User[]>("staff/users"),
@@ -515,10 +517,13 @@ export function Dashboard() {
       }
     } catch (e) {
       setError((e as Error).message);
+    } finally {
+      setPendingLoads((count) => count - 1);
     }
   }
   useEffect(() => {
-    void load();
+    // The insights panel loads on mount; only explicit refreshes invalidate it.
+    void load(false);
   }, [user]);
   async function run(fn: () => Promise<void>) {
     setBusy(true);
@@ -759,7 +764,7 @@ export function Dashboard() {
   return (
     <div className={s.page}>
       {top}
-      <main className={s.main}>
+      <main className={s.main} aria-busy={pendingLoads > 0 || busy}>
         <div className={s.heading}>
           <div>
             <p className={s.eyebrow}>

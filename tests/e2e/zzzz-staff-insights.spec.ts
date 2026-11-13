@@ -66,27 +66,53 @@ test("marketing and settings saves preserve each other's fields", async ({ page 
 });
 
 test("manager navigation is read only for marketing and insights recover from errors on mobile", async ({ page }) => {
- await owner(page);
  await page.route("**/api/staff/auth/me", async (route) => {
   const response = await route.fetch(); const result = await response.json();
   await route.fulfill({ json: { user: { ...result.user, role: "manager" } } });
  });
+ let releaseInitialStatus!: () => void;
+ const initialStatus = new Promise<void>((resolve) => { releaseInitialStatus = resolve; });
+ let statusRequests = 0;
+ await page.route("**/api/staff/status", async (route) => {
+  const response = await route.fetch();
+  if (++statusRequests === 1) await initialStatus;
+  await route.fulfill({ response });
+ });
  let failing = true;
+ let insightsRequests = 0;
  await page.route("**/api/staff/insights?*", async (route) => {
+  insightsRequests++;
   if (failing) await route.fulfill({ status: 503, json: { error: "Unavailable" } });
   else await route.continue();
  });
  await page.setViewportSize({ width: 390, height: 844 });
- await page.reload();
- await expect(page.getByRole("alert").filter({ hasText: "Не удалось загрузить показатели" })).toBeVisible();
+ await owner(page);
+ const failure = page.getByRole("alert").filter({ hasText: "Не удалось загрузить показатели" });
+ const retry = page.getByRole("button", { name: "Повторить", exact: true });
+ await expect(failure).toBeVisible();
+ await expect(retry).toBeVisible();
+ // Complete the initial dashboard requests after insights has already failed.
+ const statusCompleted = page.waitForResponse((response) => response.url().endsWith("/api/staff/status"));
+ releaseInitialStatus();
+ await statusCompleted;
+ await expect(page.getByRole("main")).toHaveAttribute("aria-busy", "false");
+ await expect(failure).toBeVisible();
+ await expect(retry).toBeVisible();
  failing = false;
- await page.getByRole("button", { name: "Повторить", exact: true }).click();
+ await retry.click();
+ await expect(page.getByRole("heading", { name: "Выручка завершённых заказов", exact: true })).toBeVisible();
+ const refreshedInsights = page.waitForResponse((response) => response.url().endsWith("/api/staff/insights?days=30"));
+ await page.getByRole("button", { name: "Обновить", exact: true }).click();
+ expect((await refreshedInsights).ok()).toBeTruthy();
  await expect(page.getByRole("heading", { name: "Выручка завершённых заказов", exact: true })).toBeVisible();
  await expect(page.getByRole("button", { name: "Команда", exact: true })).toHaveCount(0);
  await expect(page.getByRole("button", { name: "Настройки", exact: true })).toHaveCount(0);
  await page.getByRole("button", { name: "Маркетинг", exact: true }).click();
  await expect(page.getByText("Просмотр: изменения доступны владельцу.", { exact: true })).toBeVisible();
  await expect(page.locator('input[name="announcement_ru"]')).toBeDisabled();
+ // Marketing fields also prove the initial dashboard load finished. Only the
+ // failed request, the explicit retry and the explicit refresh may load insights.
+ expect(insightsRequests).toBe(3);
  await expect(page.getByRole("button", { name: "Сохранить", exact: true })).toHaveCount(0);
  await page.getByRole("button", { name: "Помощь", exact: true }).click();
  await expect(page.getByRole("heading", { name: "Помощь сотруднику" })).toBeVisible();
