@@ -24,6 +24,7 @@ export function proxy(request: NextRequest) {
   const publicAsset =
     pathname === "/manifest.webmanifest" ||
     pathname === "/icon.svg" ||
+    /^\/fonts\/inter-(latin|cyrillic|cyrillic-ext)-wght-normal\.woff2$/.test(pathname) ||
     /^\/icons\/[a-z0-9-]+\.png$/.test(pathname);
   if (
     staffHost &&

@@ -1,4 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
+import { hash } from "@node-rs/argon2";
 import { randomBytes } from "node:crypto";
 import { chmod, mkdir, mkdtemp, readFile } from "node:fs/promises";
 import http from "node:http";
@@ -40,6 +41,8 @@ await chmod(key, 0o600);
 const env = {
   ...process.env,
   APP_ENV: "test",
+  DEV_ACCESS_ENABLED: "true",
+  DEV_ACCESS_PASSWORD_HASH: await hash("Urbanmag-public-dev-gate-test-password"),
   APIPAY_MODE: "mock",
   APIPAY_WEBHOOK_SECRET: "urbanmag-e2e-public-signature-fixture",
   DATABASE_URL: "",

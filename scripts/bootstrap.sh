@@ -6,6 +6,11 @@ if [[ -e .env.dev || -e .env.prod ]]; then
   echo 'An environment file already exists; refusing to overwrite it.' >&2
   exit 1
 fi
+# Verify the runtime and installed native dependency before creating any files.
+if ! command -v node >/dev/null 2>&1 || ! node --input-type=module -e 'if (Number(process.versions.node.split(".")[0]) !== 26) process.exit(1); await import("@node-rs/argon2");' >/dev/null 2>&1; then
+  echo 'Node.js 26 and installed dependencies are required. Select Node.js 26, run npm ci, then retry.' >&2
+  exit 1
+fi
 secret_dir="${URBANMAG_SECRET_DIR:-$HOME/.config/urbanmag}"
 mkdir -p "$secret_dir"
 chmod 700 "$secret_dir"
@@ -33,13 +38,11 @@ ENV
 }
 make_env .env.dev https://dev-u.perricheno.com https://staff-dev-u.perricheno.com mock
 make_env .env.prod https://u.perricheno.com https://staff-u.perricheno.com sandbox
+node scripts/dev-access-credentials.mjs .env.dev "$secret_dir"
 if command -v docker >/dev/null 2>&1; then
-  password=$(random)
-  docker run --rm httpd:2.4-alpine htpasswd -nbB urbanmag "$password" > "$secret_dir/dev.htpasswd"
-  printf '%s\n' "$password" > "$secret_dir/dev-basic-password"
   for network in urbanmag-prod-frontend urbanmag-dev-frontend; do docker network inspect "$network" >/dev/null 2>&1 || docker network create "$network" >/dev/null; done
 else
-  echo 'Docker unavailable: create dev.htpasswd with htpasswd -c and create Docker frontend networks before starting edge.'
+  echo 'Docker unavailable: create the Docker frontend networks before starting edge.'
 fi
 printf 'Created .env.dev and .env.prod with independent credentials. Configure owner email, SMTP and ApiPay before use. Secrets directory: %s\n' "$secret_dir"
 printf 'Place the Cloudflare tunnel token in %s/tunnel-token (mode 600); set URBANMAG_SECRET_DIR to that directory.\n' "$secret_dir"

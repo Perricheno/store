@@ -6,7 +6,6 @@ services:
     ports: ["127.0.0.1:8080:8080"]
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ${URBANMAG_SECRET_DIR:?Set URBANMAG_SECRET_DIR}/dev.htpasswd:/run/secrets/dev.htpasswd:ro
     networks: [prod, dev]
   cloudflared:
     image: cloudflare/cloudflared:latest
