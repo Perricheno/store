@@ -83,6 +83,7 @@ export const orders = pgTable("orders", {
     .defaultNow(),
 });
 export const payments = pgTable("payments", {
+  method: text("method").notNull().default("apipay"),
   id: text("id").primaryKey(),
   orderId: text("order_id")
     .notNull()
@@ -174,6 +175,65 @@ export const paymentEvents = pgTable("payment_events", {
     .references(() => orders.id),
   eventType: text("event_type").notNull(),
   payload: jsonb("payload").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const wallets = pgTable(
+  "wallets",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    environment: text("environment").notNull(),
+    currency: text("currency").notNull().default("KZT"),
+    balance: integer("balance").notNull().default(0),
+    frozen: boolean("frozen").notNull().default(false),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.environment] })],
+);
+export const walletTopups = pgTable("wallet_topups", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id),
+  environment: text("environment").notNull(),
+  amount: integer("amount").notNull(),
+  phone: text("phone").notNull(),
+  status: text("status").notNull(),
+  invoiceId: text("invoice_id").unique(),
+  idempotencyKey: text("idempotency_key").notNull(),
+  requestHash: text("request_hash").notNull(),
+  refundedAmount: integer("refunded_amount").notNull().default(0),
+  lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+export const walletEntries = pgTable("wallet_entries", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id),
+  environment: text("environment").notNull(),
+  kind: text("kind").notNull(),
+  amount: integer("amount").notNull(),
+  balanceAfter: integer("balance_after").notNull(),
+  topupId: text("topup_id").references(() => walletTopups.id),
+  orderId: text("order_id").references(() => orders.id),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+export const walletTopupEvents = pgTable("wallet_topup_events", {
+  eventId: text("event_id").primaryKey(),
+  topupId: text("topup_id")
+    .notNull()
+    .references(() => walletTopups.id),
+  eventType: text("event_type").notNull(),
+  payload: jsonb("payload").notNull(),
+  resolved: boolean("resolved").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

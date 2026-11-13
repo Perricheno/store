@@ -7,6 +7,8 @@ import {
   failJob,
   getInvoiceOrder,
   recordInvoice,
+  getWalletTopupInvoice,
+  recordWalletTopupInvoice,
 } from "@urbanmag/core";
 
 // Only the isolated E2E environment writes mail to disk; production always uses SMTP in the worker.
@@ -29,6 +31,14 @@ export async function drainTestJobs() {
             paymentUrl: null,
             environment: "mock",
             amount: order.total,
+          });
+      } else if (job.type === "create_wallet_topup_invoice") {
+        const topup = await getWalletTopupInvoice(String(job.payload.topupId));
+        if (topup)
+          await recordWalletTopupInvoice(topup.id, {
+            invoiceId: `mock-${topup.id}`,
+            amount: topup.total,
+            environment: "mock",
           });
       } else if (job.type === "send_mail") {
         const mail = decryptMailPayload(job.payload);

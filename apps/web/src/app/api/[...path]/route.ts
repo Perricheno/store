@@ -36,7 +36,8 @@ function publicOrder(order: core.Order) {
     isDemo: order.lines.some((l) => l.isDemo),
     simulationAllowed:
       process.env.APP_ENV !== "production" &&
-      process.env.APIPAY_MODE === "mock",
+      process.env.APIPAY_MODE === "mock" &&
+      order.paymentMethod !== "wallet",
   };
 }
 async function handler(
@@ -249,6 +250,28 @@ async function handler(
       await core.claimAccount(input.token, input.newPassword);
       return json({ ok: true });
     }
+    if (path === "wallet" || path.startsWith("wallet/")) {
+      const user = await currentUser();
+      if (!user || user.mustChangePassword)
+        throw new core.CoreError(401, "UNAUTHORIZED", "Войдите в кабинет");
+      if (path === "wallet" && method === "GET")
+        return json(await core.getWallet(user.id));
+      if (path === "wallet/topups" && method === "POST") {
+        rateLimit(request, "wallet-topup", 10);
+        const result = await core.createWalletTopup(
+          user.id,
+          await body(request),
+        );
+        await drainTestJobs();
+        return json(result, 201);
+      }
+      const match = /^wallet\/topups\/([^/]+)(?:\/(simulate))?$/.exec(path);
+      if (match && method === "GET" && !match[2])
+        return json(await core.getWalletTopup(user.id, match[1]));
+      if (match && method === "POST" && match[2] === "simulate")
+        return json(await core.simulateWalletTopup(user.id, match[1]));
+      return json({ error: "Not found" }, 404);
+    }
     if (path === "account/orders" && method === "GET") {
       const user = await currentUser();
       if (!user || user.mustChangePassword)
@@ -334,6 +357,11 @@ async function handler(
         const days = new URL(request.url).searchParams.get("days");
         return json(await core.getStaffInsights(user.id, days === null ? {} : { days: Number(days) }));
       }
+      if (
+        /^staff\/orders\/[^/]+\/wallet-refund$/.test(path) &&
+        method === "POST"
+      )
+        return json(await core.refundWalletOrder(user.id, path.split("/")[2]));
       if (path === "staff/orders") return json(await core.listOrders(user.id));
       if (/^staff\/orders\/[^/]+$/.test(path) && method === "PATCH") {
         const input = await body(request);
@@ -418,6 +446,21 @@ async function webhook(request: NextRequest) {
     ].includes(status)
   )
     return json({ ok: true });
+  const eventId = createHash("sha256").update(raw).digest("hex");
+  if (await core.isWalletTopupId(String(invoice.external_order_id))) {
+    await core.processWalletTopupEvent({
+      eventId,
+      topupId: String(invoice.external_order_id),
+      invoiceId: String(invoice.id),
+      amount: Number(invoice.amount),
+      environment,
+      status,
+      ...(invoice.total_refunded != null
+        ? { refundedAmount: Number(invoice.total_refunded) }
+        : {}),
+    });
+    return json({ ok: true });
+  }
   await core.processPaymentEvent({
     eventId: createHash("sha256").update(raw).digest("hex"),
     orderId: String(invoice.external_order_id),

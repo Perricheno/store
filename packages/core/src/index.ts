@@ -30,6 +30,24 @@ import {
   type CatalogPage,
 } from "./types";
 export * from "./types";
+export {
+  getWallet,
+  createWalletTopup,
+  getWalletTopup,
+  getWalletTopupInvoice,
+  recordWalletTopupInvoice,
+  processWalletTopupEvent,
+  isWalletTopupId,
+  simulateWalletTopup,
+  listPendingWalletTopupInvoices,
+  refundWalletOrder,
+} from "./wallet";
+import {
+  lockCheckoutWallet,
+  debitCheckoutWallet,
+  requireWalletCustomer,
+} from "./wallet";
+import type { PaymentEnvironment } from "./types";
 export { getDrizzle };
 export { CATEGORIES } from "./categories";
 const runtime = globalThis as typeof globalThis & {
@@ -705,6 +723,7 @@ export async function claimAccount(value: string, newPassword: string) {
   return redeemPasswordToken(value, newPassword, "claim", "buyer");
 }
 const checkoutSchema = z.object({
+  paymentMethod: z.enum(["apipay", "wallet"]).default("apipay"),
   email: emailSchema,
   phone: z
     .string()
@@ -720,6 +739,7 @@ const checkoutSchema = z.object({
   locale: localeSchema,
 });
 export interface CheckoutInput {
+  paymentMethod?: "apipay" | "wallet";
   email: string;
   phone: string;
   fulfillment: string;
@@ -743,7 +763,12 @@ async function orderView(db: DB, row: Row): Promise<Order> {
     createdAt: date(row.created_at),
     expiresAt: date(row.expires_at),
     ...(payment?.payment_url ? { paymentUrl: payment.payment_url } : {}),
-    ...(payment ? { paymentStatus: payment.status } : {}),
+    ...(payment
+      ? {
+          paymentStatus: payment.status,
+          paymentMethod: payment.method || "apipay",
+        }
+      : {}),
   };
 }
 function payEnvironment() {
@@ -766,7 +791,10 @@ export async function createCheckout(
   await initCore();
   const data = parse(checkoutSchema, input);
   const environment = payEnvironment();
-  const requestHash = sha(JSON.stringify(data));
+  const { paymentMethod: selectedMethod, ...legacyData } = data;
+  const requestHash = sha(
+    JSON.stringify(selectedMethod === "apipay" ? legacyData : data),
+  );
   return transaction(async (db) => {
     await lockVisitor(db, visitorId);
     const [existing] = await db.query(
@@ -775,6 +803,20 @@ export async function createCheckout(
     );
     const current = await cart(db, visitorId);
     if (existing) {
+      const [originalPayment] = await db.query(
+        "SELECT method,environment FROM payments WHERE order_id=$1",
+        [existing.id],
+      );
+      if (
+        (originalPayment?.method || "apipay") !== data.paymentMethod ||
+        (data.paymentMethod === "wallet" &&
+          (!sessionUserId ||
+            existing.user_id !== sessionUserId ||
+            originalPayment.environment !== environment))
+      )
+        fail(409, "CHECKOUT_CHANGED", "Параметры заказа изменились");
+      if (data.paymentMethod === "wallet")
+        await requireWalletCustomer(db, sessionUserId!);
       if (existing.request_hash !== requestHash)
         fail(409, "CHECKOUT_CHANGED", "Параметры заказа изменились");
       if (current.items.length) {
@@ -795,6 +837,16 @@ export async function createCheckout(
       }
       return { order: await orderView(db, existing) };
     }
+    if (data.paymentMethod === "wallet" && !sessionUserId)
+      fail(401, "UNAUTHORIZED", "Войдите в кабинет");
+    const wallet =
+      data.paymentMethod === "wallet"
+        ? await lockCheckoutWallet(
+            db,
+            sessionUserId!,
+            environment as PaymentEnvironment,
+          )
+        : undefined;
     if (!current.items.length) fail(409, "EMPTY_CART", "Корзина пуста");
     if (current.total !== data.expectedTotal)
       fail(409, "TOTAL_CHANGED", "Цена заказа изменилась");
@@ -808,6 +860,7 @@ export async function createCheckout(
         "Демонстрационные товары нельзя оплачивать в реальном режиме",
       );
     if (
+      data.paymentMethod === "apipay" &&
       environment === "production" &&
       ["APIPAY_API_KEY", "APIPAY_WEBHOOK_SECRET", "SMTP_URL", "MAIL_FROM"].some(
         (key) => !process.env[key],
@@ -830,6 +883,15 @@ export async function createCheckout(
       fresh.items.length !== current.items.length
     )
       fail(409, "TOTAL_CHANGED", "Цена заказа изменилась");
+    if (
+      environment === "production" &&
+      fresh.items.some((i) => i.product.isDemo)
+    )
+      fail(
+        409,
+        "DEMO_PAYMENT_BLOCKED",
+        "Демонстрационные товары нельзя оплачивать в реальном режиме",
+      );
     const orderId = randomUUID(),
       accessToken = token();
     const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
@@ -954,10 +1016,21 @@ export async function createCheckout(
         );
     }
     await db.query(
-      "INSERT INTO payments(id,order_id,amount,environment,status) VALUES($1,$2,$3,$4,'pending')",
-      [randomUUID(), orderId, fresh.total, environment],
+      "INSERT INTO payments(id,order_id,amount,environment,status,method) VALUES($1,$2,$3,$4,$5,$6)",
+      [
+        randomUUID(),
+        orderId,
+        fresh.total,
+        environment,
+        wallet ? "paid" : "pending",
+        data.paymentMethod,
+      ],
     );
-    await enqueue(db, "create_invoice", { orderId });
+    if (wallet) {
+      await debitCheckoutWallet(db, wallet, orderId, fresh.total);
+      await releaseStock(db, orderId, true);
+      await db.query("UPDATE orders SET status='paid' WHERE id=$1", [orderId]);
+    } else await enqueue(db, "create_invoice", { orderId });
     await db.query("DELETE FROM carts WHERE visitor_id=$1", [visitorId]);
     await audit(db, attachedUserId, "order.created", orderId, {
       total: fresh.total,
@@ -1484,7 +1557,7 @@ export async function getInvoiceOrder(orderId: string): Promise<{
   const [row] = await (
     await database()
   ).query(
-    "SELECT o.*,p.environment FROM orders o JOIN payments p ON p.order_id=o.id WHERE o.id=$1",
+    "SELECT o.*,p.environment FROM orders o JOIN payments p ON p.order_id=o.id WHERE o.id=$1 AND p.method='apipay'",
     [orderId],
   );
   if (!row) return null;
@@ -1537,7 +1610,8 @@ export async function recordInvoice(
       "SELECT * FROM payments WHERE order_id=$1 FOR UPDATE",
       [orderId],
     );
-    if (!order || !payment) fail(404, "NOT_FOUND", "Заказ не найден");
+    if (!order || !payment || payment.method !== "apipay")
+      fail(404, "NOT_FOUND", "Заказ не найден");
     if (
       payment.amount !== value.amount ||
       payment.environment !== value.environment
@@ -1607,6 +1681,7 @@ export async function processPaymentEvent(
     );
     if (
       !payment ||
+      payment.method !== "apipay" ||
       payment.amount !== value.amount ||
       payment.environment !== value.environment ||
       (payment.invoice_id && payment.invoice_id !== value.invoiceId)
@@ -1731,7 +1806,7 @@ export async function listPendingInvoices(): Promise<
       db.query(
         `SELECT p.id,p.order_id,p.invoice_id,p.amount,p.environment
        FROM payments p JOIN orders o ON o.id=p.order_id
-       WHERE p.invoice_id IS NOT NULL AND p.status<>'refunded'
+       WHERE p.method='apipay' AND p.invoice_id IS NOT NULL AND p.status<>'refunded'
          AND (${condition}) AND NOT(p.id=ANY($2::text[]))
        ORDER BY p.last_checked_at ASC NULLS FIRST,p.created_at ASC,p.id ASC
        LIMIT $1 FOR UPDATE OF p SKIP LOCKED`,
@@ -1830,6 +1905,7 @@ export async function retryPayment(
       [orderId],
     );
     if (
+      payment?.method !== "apipay" ||
       order.status !== "awaiting_payment" ||
       new Date(order.expires_at).getTime() <= Date.now()
     )

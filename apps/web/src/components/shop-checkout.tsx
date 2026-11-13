@@ -5,6 +5,9 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ArrowRight, Check, MapPin } from "@phosphor-icons/react";
 import { dictionary, money } from "../lib/i18n";
 import s from "./shop.module.css";
+import w from "./shop-wallet.module.css";
+import { walletCopy, walletError } from "./wallet-copy";
+import type { Wallet } from "@urbanmag/core";
 import { type Common, type Order } from "./shop-types";
 import {
   useCart,
@@ -20,7 +23,16 @@ import { ShopShell } from "./shop-shell";
 import { ErrorNotice, PageTitle, Empty, CartSummary } from "./shop-ui";
 
 export function CheckoutView({ locale, settings, initialCart }: Common) {
-  const t = dictionary(locale);
+  const t = dictionary(locale),
+    wc = walletCopy(locale);
+  const [paymentMethod, setPaymentMethod] = useState<"apipay" | "wallet">(
+    "apipay",
+  );
+  const [wallet, setWallet] = useState<Wallet | null>(null);
+  const [walletAuth, setWalletAuth] = useState<
+    "loading" | "confirmed" | "guest" | "error"
+  >("loading");
+  const [walletLoadError, setWalletLoadError] = useState(false);
   const { cart, loading, error, refresh } = useCart(initialCart);
   const [ready, setReady] = useState<boolean | null>(null);
   const [email, setEmail] = useState(""),
@@ -31,15 +43,49 @@ export function CheckoutView({ locale, settings, initialCart }: Common) {
   const idempotency = useRef("");
   const submitting = useRef(false);
   useEffect(() => {
-    request<{ checkoutEnabled: boolean }>("/api/settings")
-      .then((d) => setReady(d.checkoutEnabled))
-      .catch(() => setReady(false));
-    idempotency.current = crypto.randomUUID();
-    request<{ user: { email: string } | null }>("/api/auth/me")
+    const controller = new AbortController();
+    request<{ checkoutEnabled: boolean }>("/api/settings", {
+      signal: controller.signal,
+    })
       .then((d) => {
-        if (d.user?.email) setEmail(d.user.email);
+        if (!controller.signal.aborted) setReady(d.checkoutEnabled);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!controller.signal.aborted) setReady(false);
+      });
+    idempotency.current = crypto.randomUUID();
+    request<{
+      user: {
+        email: string;
+        role?: string;
+        mustChangePassword?: boolean;
+      } | null;
+    }>("/api/auth/me", { signal: controller.signal })
+      .then(async (d) => {
+        if (controller.signal.aborted) return;
+        if (d.user?.email) setEmail(d.user.email);
+        if (
+          !d.user ||
+          d.user.mustChangePassword ||
+          d.user.role !== "customer"
+        ) {
+          setWalletAuth("guest");
+          return;
+        }
+        setWalletAuth("confirmed");
+        try {
+          const result = await request<Wallet>("/api/wallet", {
+            signal: controller.signal,
+          });
+          if (!controller.signal.aborted) setWallet(result);
+        } catch {
+          if (!controller.signal.aborted) setWalletLoadError(true);
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setWalletAuth("error");
+      });
+    return () => controller.abort();
   }, []);
   useEffect(() => {
     if (
@@ -57,7 +103,16 @@ export function CheckoutView({ locale, settings, initialCart }: Common) {
   }, [order?.id, order?.paymentStatus, order?.status]);
   async function checkout(e: FormEvent) {
     e.preventDefault();
-    if (!ready || submitting.current) return;
+    if (
+      !ready ||
+      submitting.current ||
+      (paymentMethod === "wallet" &&
+        (!wallet ||
+          wallet.frozen ||
+          !wallet.topupAvailable ||
+          wallet.balance < cart.total))
+    )
+      return;
     submitting.current = true;
     setBusy(true);
     setFormError("");
@@ -79,6 +134,7 @@ export function CheckoutView({ locale, settings, initialCart }: Common) {
         expectedTotal: confirmedCart.total,
         idempotencyKey: idempotency.current,
         locale,
+        paymentMethod,
       });
       setOrder("order" in created ? created.order : created);
       cartChanged();
@@ -103,6 +159,25 @@ export function CheckoutView({ locale, settings, initialCart }: Common) {
             en: "The selected size sold out. Update your bag.",
           }[locale],
         );
+      } else if (
+        [
+          "INSUFFICIENT_FUNDS",
+          "WALLET_FROZEN",
+          "WALLET_UNAVAILABLE",
+          "UNAUTHORIZED",
+          "PASSWORD_CHANGE_REQUIRED",
+        ].includes(code || "")
+      ) {
+        setFormError(walletError(code, locale));
+        if (paymentMethod === "wallet") {
+          try {
+            setWallet(await request<Wallet>("/api/wallet"));
+            setWalletLoadError(false);
+          } catch {
+            setWallet(null);
+            setWalletLoadError(true);
+          }
+        }
       } else setFormError(t.orderError);
     } finally {
       submitting.current = false;
@@ -142,7 +217,9 @@ export function CheckoutView({ locale, settings, initialCart }: Common) {
               {order.paymentStatus === "paid" ? t.paid : t.orderReceived}
               <span className={s.titleDot}>.</span>
             </h1>
-            <p>{t.orderHint}</p>
+            <p>
+              {order.paymentMethod === "wallet" ? wc.paidWallet : t.orderHint}
+            </p>
             <div className={s.orderReceipt}>
               <div>
                 <span>{t.status}</span>
@@ -218,6 +295,10 @@ export function CheckoutView({ locale, settings, initialCart }: Common) {
                         type="email"
                         autoComplete="email"
                         value={email}
+                        readOnly={
+                          paymentMethod === "wallet" &&
+                          walletAuth === "confirmed"
+                        }
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="you@example.com"
                       />
@@ -274,6 +355,69 @@ export function CheckoutView({ locale, settings, initialCart }: Common) {
                       <span>{t.unavailable}</span>
                     </label>
                   </section>
+                  <fieldset className={w.paymentOptions}>
+                    <legend>{wc.payment}</legend>
+                    <label className={w.option}>
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        value="apipay"
+                        checked={paymentMethod === "apipay"}
+                        disabled={busy}
+                        onChange={() => setPaymentMethod("apipay")}
+                      />
+                      <strong>{wc.apipay}</strong>
+                    </label>
+                    <label className={w.option}>
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        value="wallet"
+                        checked={paymentMethod === "wallet"}
+                        disabled={busy}
+                        onChange={() => setPaymentMethod("wallet")}
+                      />
+                      <div>
+                        <strong>{wc.wallet}</strong>
+                        {walletAuth === "loading" ||
+                        (walletAuth === "confirmed" &&
+                          !wallet &&
+                          !walletLoadError) ? (
+                          <small>{wc.loading}</small>
+                        ) : walletAuth === "guest" ? (
+                          <small>{wc.loginCheckout}</small>
+                        ) : walletLoadError || walletAuth === "error" ? (
+                          <small className={w.error}>{wc.error}</small>
+                        ) : (
+                          wallet && (
+                            <>
+                              <p className={w.checkoutBalance}>
+                                {money(wallet.balance, locale)}
+                              </p>
+                              <small>{wc[wallet.environment]}</small>
+                              {wallet.frozen ? (
+                                <small className={w.error}>{wc.frozen}</small>
+                              ) : !wallet.topupAvailable ? (
+                                <small>{wc.walletUnavailable}</small>
+                              ) : wallet.balance < cart.total ? (
+                                <small className={w.error}>
+                                  {wc.insufficient}
+                                </small>
+                              ) : null}
+                            </>
+                          )
+                        )}
+                      </div>
+                    </label>
+                    <div className={w.checkoutLinks}>
+                      <Link prefetch={false} href={`/${locale}/account/wallet`}>
+                        {wc.topup}
+                      </Link>
+                      <Link prefetch={false} href={`/${locale}/account`}>
+                        {wc.account}
+                      </Link>
+                    </div>
+                  </fieldset>
                 </div>
                 <CartSummary cart={cart} locale={locale}>
                   <div className={s.checkoutPreview}>
@@ -303,7 +447,15 @@ export function CheckoutView({ locale, settings, initialCart }: Common) {
                   )}
                   <button
                     className={s.primaryButton}
-                    disabled={busy || !ready}
+                    disabled={
+                      busy ||
+                      !ready ||
+                      (paymentMethod === "wallet" &&
+                        (!wallet ||
+                          wallet.frozen ||
+                          !wallet.topupAvailable ||
+                          wallet.balance < cart.total))
+                    }
                     type="submit"
                   >
                     {busy ? t.loading : t.placeOrder}

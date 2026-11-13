@@ -24,4 +24,31 @@ INSERT INTO schema_migrations(version) VALUES (2) ON CONFLICT DO NOTHING;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS details jsonb NOT NULL DEFAULT '[]';
 ALTER TABLE products ADD COLUMN IF NOT EXISTS promotion jsonb;
 INSERT INTO schema_migrations(version) VALUES (3) ON CONFLICT DO NOTHING;
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS method text NOT NULL DEFAULT 'apipay' CHECK(method IN ('apipay','wallet'));
+CREATE TABLE IF NOT EXISTS wallets (
+ user_id text NOT NULL REFERENCES users(id),environment text NOT NULL CHECK(environment IN ('mock','sandbox','production')),
+ currency text NOT NULL DEFAULT 'KZT' CHECK(currency='KZT'),balance integer NOT NULL DEFAULT 0 CHECK(balance>=0),frozen boolean NOT NULL DEFAULT false,
+ PRIMARY KEY(user_id,environment));
+CREATE TABLE IF NOT EXISTS wallet_topups (
+ id text PRIMARY KEY,user_id text NOT NULL REFERENCES users(id),environment text NOT NULL CHECK(environment IN ('mock','sandbox','production')),
+ amount integer NOT NULL CHECK(amount BETWEEN 1 AND 100000000),phone text NOT NULL,status text NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','paid','cancelled','expired','error','refunded','manual_review')),
+ invoice_id text UNIQUE,idempotency_key text NOT NULL,request_hash text NOT NULL,refunded_amount integer NOT NULL DEFAULT 0 CHECK(refunded_amount>=0 AND refunded_amount<=amount),
+ last_checked_at timestamptz,created_at timestamptz NOT NULL DEFAULT now(),UNIQUE(user_id,environment,idempotency_key),
+ FOREIGN KEY(user_id,environment) REFERENCES wallets(user_id,environment));
+CREATE TABLE IF NOT EXISTS wallet_entries (
+ id text PRIMARY KEY,user_id text NOT NULL,environment text NOT NULL,kind text NOT NULL CHECK(kind IN ('topup_credit','order_debit','order_refund','topup_reversal')),
+ amount integer NOT NULL CHECK(amount>0),balance_after integer NOT NULL CHECK(balance_after>=0),topup_id text REFERENCES wallet_topups(id),order_id text REFERENCES orders(id),created_at timestamptz NOT NULL DEFAULT now(),
+ FOREIGN KEY(user_id,environment) REFERENCES wallets(user_id,environment),
+ CHECK((kind IN ('topup_credit','topup_reversal') AND topup_id IS NOT NULL AND order_id IS NULL) OR (kind IN ('order_debit','order_refund') AND order_id IS NOT NULL AND topup_id IS NULL)));
+CREATE UNIQUE INDEX IF NOT EXISTS wallet_topup_credit_once ON wallet_entries(topup_id) WHERE kind='topup_credit';
+CREATE UNIQUE INDEX IF NOT EXISTS wallet_order_debit_once ON wallet_entries(order_id) WHERE kind='order_debit';
+CREATE UNIQUE INDEX IF NOT EXISTS wallet_order_refund_once ON wallet_entries(order_id) WHERE kind='order_refund';
+CREATE INDEX IF NOT EXISTS wallet_entries_owner ON wallet_entries(user_id,environment,created_at,id);
+CREATE TABLE IF NOT EXISTS wallet_topup_events (
+ event_id text PRIMARY KEY,topup_id text NOT NULL REFERENCES wallet_topups(id),event_type text NOT NULL,payload jsonb NOT NULL,resolved boolean NOT NULL DEFAULT true,created_at timestamptz NOT NULL DEFAULT now());
+CREATE OR REPLACE FUNCTION protect_wallet_ledger() RETURNS trigger LANGUAGE plpgsql AS $wallet$
+ BEGIN RAISE EXCEPTION 'Wallet ledger entries are immutable'; END; $wallet$;
+DROP TRIGGER IF EXISTS wallet_ledger_immutable ON wallet_entries;
+CREATE TRIGGER wallet_ledger_immutable BEFORE UPDATE OR DELETE ON wallet_entries FOR EACH ROW EXECUTE FUNCTION protect_wallet_ledger();
+INSERT INTO schema_migrations(version) VALUES (4) ON CONFLICT DO NOTHING;
 `;

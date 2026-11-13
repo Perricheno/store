@@ -78,6 +78,7 @@ export interface Order {
   expiresAt: string;
   paymentUrl?: string;
   paymentStatus?: string;
+  paymentMethod?: "apipay" | "wallet";
 }
 export interface Settings {
   contentPages?: Partial<
@@ -150,4 +151,32 @@ export interface StaffInsights {
   categorySales: Array<{ category: string | null; units: number; amount: number }>;
   /** History counts are all-time; linesWithoutCategory covers sales in the selected period. */
   quality: { allOrders: number; verifiedRealOrders: number; demoOrders: number; sandboxOrders: number; unverifiedOrders: number; completedWithoutTimestamp: number; linesWithoutCategory: number; partialRefundOrders: number };
+}
+
+export type PaymentEnvironment = "mock" | "sandbox" | "production";
+export interface WalletTopup {
+  id: string;
+  amount: number;
+  environment: PaymentEnvironment;
+  status: string;
+  createdAt: string;
+  simulationAllowed: boolean;
+}
+export interface WalletEntry {
+  id: string;
+  kind: "topup_credit" | "order_debit" | "order_refund" | "topup_reversal";
+  amount: number;
+  balanceAfter: number;
+  createdAt: string;
+  orderId?: string;
+  topupId?: string;
+}
+export interface Wallet {
+  environment: PaymentEnvironment;
+  currency: "KZT";
+  balance: number;
+  frozen: boolean;
+  entries: WalletEntry[];
+  topups: WalletTopup[];
+  topupAvailable: boolean;
 }

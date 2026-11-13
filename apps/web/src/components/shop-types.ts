@@ -51,6 +51,7 @@ export type Order = {
   status: string;
   total: number;
   paymentStatus: string;
+  paymentMethod?: "apipay" | "wallet";
   isDemo?: boolean;
   simulationAllowed?: boolean;
   createdAt?: string;
