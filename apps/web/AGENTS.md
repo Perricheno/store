@@ -11,3 +11,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 ## Иконки категорий
 
 `src/lib/category-icons.ts` задает единый набор иконок категорий. После изменения набора выполните `npx tsx scripts/generate-category-masks.ts` из корня репозитория: `src/lib/category-masks.ts` — генерируемые статичные SVG-маски. Не редактируйте их вручную. Блик анимируется HTML-transform внутри статичной CSS-маски; сохраняйте паузу вне экрана, после загрузки фотографии и при уменьшении движения.
+
+## Витрина и корзина
+
+Компоненты витрины разделены по маршрутам в `src/components/shop-*.tsx`; общие элементы находятся в `shop-shell.tsx` и `shop-ui.tsx`, характеристики и быстрое добавление — в `shop-product-features.tsx`. Очередь и состояние корзины находятся в `src/lib/cart-store.ts`; ее тесты входят в `npm test` и отдельно запускаются из корня командой `npx tsx --test tests/cart-store.test.ts`. Публичные данные каталога подготавливает `src/lib/public-catalog.ts`.
