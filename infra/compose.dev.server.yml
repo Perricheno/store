@@ -1,0 +1,18 @@
+services:
+  web:
+    image: ${IMAGE_TAG:?Set immutable IMAGE_TAG}
+    restart: unless-stopped
+    command: ["node", "apps/web/server.js"]
+    environment:
+      APP_ENV: development
+      APIPAY_MODE: mock
+      NODE_ENV: production
+    volumes: !override ["uploads:/data/uploads"]
+  worker:
+    image: ${IMAGE_TAG:?Set immutable IMAGE_TAG}
+    command: ["./node_modules/.bin/tsx", "apps/worker/src/index.ts"]
+    environment:
+      APP_ENV: development
+      APIPAY_MODE: mock
+      NODE_ENV: production
+    volumes: !override ["uploads:/data/uploads"]

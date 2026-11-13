@@ -1,0 +1,9 @@
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    user: "${URBANMAG_UID:-1000}:${URBANMAG_GID:-1000}"
+    restart: unless-stopped
+    network_mode: host
+    command: ["tunnel", "--no-autoupdate", "run", "--token-file", "/run/secrets/tunnel-token"]
+    volumes:
+      - ${URBANMAG_SECRET_DIR:?Set URBANMAG_SECRET_DIR}/tunnel-token:/run/secrets/tunnel-token:ro

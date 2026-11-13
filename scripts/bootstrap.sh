@@ -32,6 +32,7 @@ APIPAY_WEBHOOK_SECRET=
 SMTP_URL=$smtp
 MAIL_FROM=$sender
 SEO_INDEXING_ENABLED=false
+WALLET_PRODUCTION_ENABLED=false
 UPLOADS_DIR=/data/uploads
 IMAGE_TAG=urbanmag:initial
 ENV
@@ -45,4 +46,4 @@ else
   echo 'Docker unavailable: create the Docker frontend networks before starting edge.'
 fi
 printf 'Created .env.dev and .env.prod with independent credentials. Configure owner email, SMTP and ApiPay before use. Secrets directory: %s\n' "$secret_dir"
-printf 'Place the Cloudflare tunnel token in %s/tunnel-token (mode 600); set URBANMAG_SECRET_DIR to that directory.\n' "$secret_dir"
+printf 'For an optional Compose-managed tunnel, store its token in %s/tunnel-token (mode 600) and set URBANMAG_SECRET_DIR. An existing host-managed tunnel needs only its routes to the edge port.\n' "$secret_dir"
