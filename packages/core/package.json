@@ -6,7 +6,8 @@
   "main": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./categories": "./src/categories.ts"
+    "./categories": "./src/categories.ts",
+    "./barcode": "./src/barcode.ts"
   },
   "scripts": {
     "test": "tsx --test test/*.test.ts",

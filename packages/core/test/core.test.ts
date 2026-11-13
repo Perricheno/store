@@ -1340,3 +1340,21 @@ test("enriched catalog migration is idempotent and preserves staff edits", async
     15,
   );
 });
+
+test("staff product identifiers persist, reject invalid barcodes and can be cleared", async () => {
+  const input = {
+    slug: "identifiers-test", category: "accessories", gender: "unisex", brand: "Test",
+    names: { ru: "Товар", kk: "Тауар", en: "Product" }, price: 10000,
+    media: [], isDemo: false, published: false,
+    sizes: [{ size: "ONE SIZE", color: "Black", barcode: "4006381333931" }], article: "SKU-123",
+  };
+  const created = await core.upsertProduct(actorId, input);
+  assert.equal(created.article, "SKU-123");
+  assert.equal(created.sizes[0]?.barcode, "4006381333931");
+  const projected = (await core.getStaffProducts(actorId)).find(p => p.id === created.id)!;
+  assert.equal(projected.sizes[0]?.barcode, "4006381333931");
+  await assert.rejects(core.upsertProduct(actorId, { ...projected, sizes: [{ ...projected.sizes[0], barcode: "4006381333932" }] }), { code: "VALIDATION" });
+  const cleared = await core.upsertProduct(actorId, { ...projected, article: null, sizes: [{ ...projected.sizes[0], barcode: null }] });
+  assert.equal("article" in cleared, false);
+  assert.equal("barcode" in cleared.sizes[0]!, false);
+});

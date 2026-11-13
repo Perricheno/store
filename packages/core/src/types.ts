@@ -24,6 +24,7 @@ export interface Product {
   category: string;
   gender: string;
   brand: string;
+  article?: string;
   names: Translations;
   description: Translations;
   details: ProductDetail[];
@@ -31,7 +32,7 @@ export interface Product {
   price: number;
   oldPrice?: number;
   media: string[];
-  sizes: Array<{ id: string; size: string; color: string; available: number }>;
+  sizes: Array<{ id: string; size: string; color: string; available: number; barcode?: string }>;
   kaspiUrl?: string;
   isDemo: boolean;
   published: boolean;

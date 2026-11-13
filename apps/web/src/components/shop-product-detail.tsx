@@ -14,6 +14,7 @@ import {
 } from "@phosphor-icons/react";
 import { dictionary, money } from "../lib/i18n";
 import type { Product } from "@urbanmag/core";
+import { ean13Modules } from "@urbanmag/core/barcode";
 import s from "./shop.module.css";
 import { type Common } from "./shop-types";
 import { catalogCopy } from "./shop-copy";
@@ -55,6 +56,9 @@ export function ProductDetail({
   const inStock = product.sizes.some((v) => v.available > 0);
   const name = product.names[locale] || product.names.ru;
   useEffect(() => setReady(true), []);
+  const barcode = product.sizes.find((item) => item.id === variant)?.barcode;
+  const modules = barcode ? ean13Modules(barcode) : undefined;
+  const identifierCopy = { ru: { article: "Артикул", copy: "Скопировать артикул", barcode: "Штрихкод" }, kk: { article: "Артикул", copy: "Артикулды көшіру", barcode: "Штрихкод" }, en: { article: "Article", copy: "Copy article", barcode: "Barcode" } }[locale];
   useEffect(() => {
     setImageIndex(0);
     setVariant("");
@@ -216,6 +220,7 @@ export function ProductDetail({
           </div>
           <ProductPromotion product={product} locale={locale} />
           <h1>{name}</h1>
+          {product.article && <p>{identifierCopy.article}: {product.article} <button type="button" className={s.textButton} onClick={() => void navigator.clipboard.writeText(product.article!)}>{identifierCopy.copy}</button></p>}
           <p className={s.detailPrice}>
             {money(product.price, locale)}
             {product.oldPrice && product.oldPrice > product.price && (
@@ -249,6 +254,12 @@ export function ProductDetail({
             </div>
             <p className={s.sizeHelp}>{t.sizeGuide}</p>
           </div>
+          {modules && barcode && <div aria-label={`${identifierCopy.barcode}: ${barcode}`}>
+            <svg viewBox="0 0 113 60" width="226" height="120" role="img" aria-label={`${identifierCopy.barcode}: ${barcode}`} style={{ background: "white", maxWidth: "100%" }}>
+              {Array.from(modules, (bit, index) => bit === "1" ? <rect key={index} x={index + 9} y="2" width="1" height={index < 3 || (index >= 45 && index < 50) || index >= 92 ? 46 : 42} fill="black" /> : null)}
+              <text x="56.5" y="57" textAnchor="middle" fontSize="8" fill="black">{barcode}</text>
+            </svg>
+          </div>}
           {error && <ErrorNotice text={error} />}
           <div className={s.detailActions}>
             <button

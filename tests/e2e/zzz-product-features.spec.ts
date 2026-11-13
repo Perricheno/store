@@ -231,3 +231,31 @@ for (const shouldFail of [false, true]) {
     }
   });
 }
+
+test("staff can edit identifiers and selected product variant displays its barcode", async ({ page }) => {
+  await loginOwner(page);
+  const original = ((await (await page.request.get("/api/staff/products")).json()) as Product[])
+    .find((product) => product.slug === "city-tee")!;
+  const size = original.sizes.find((variant) => variant.available > 0)!;
+  try {
+    await page.getByLabel("Поиск товаров").fill(original.names.ru);
+    await page.getByRole("row").filter({ hasText: original.names.ru }).getByRole("button", { name: "Изменить" }).click();
+    const editor = page.getByRole("dialog");
+    await editor.getByLabel("Артикул", { exact: true }).fill("SKU-123");
+    await editor.getByLabel(`Штрихкод EAN-13 — ${size.size}`, { exact: true }).fill("4006381333931");
+    const saved = page.waitForResponse((r) => r.url().endsWith("/api/staff/products") && r.request().method() === "POST");
+    await editor.getByRole("button", { name: "Сохранить", exact: true }).click();
+    expect((await saved).ok()).toBeTruthy();
+    await page.goto(`/ru/p/${original.slug}`);
+    await expect(page.getByText("Артикул: SKU-123")).toBeVisible();
+    await expect(page.getByRole("img", { name: "Штрихкод: 4006381333931" })).toHaveCount(0);
+    await page.getByRole("button", { name: size.size, exact: true }).click();
+    await expect(page.getByRole("img", { name: "Штрихкод: 4006381333931" })).toBeVisible();
+  } finally {
+    const restored = await page.request.post("/api/staff/products", {
+      headers: { Origin: "https://localhost:3443" },
+      data: { ...original, article: original.article ?? null, sizes: original.sizes.map(v => ({ ...v, barcode: v.barcode ?? null })) },
+    });
+    expect(restored.ok()).toBeTruthy();
+  }
+});

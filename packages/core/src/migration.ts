@@ -51,4 +51,7 @@ CREATE OR REPLACE FUNCTION protect_wallet_ledger() RETURNS trigger LANGUAGE plpg
 DROP TRIGGER IF EXISTS wallet_ledger_immutable ON wallet_entries;
 CREATE TRIGGER wallet_ledger_immutable BEFORE UPDATE OR DELETE ON wallet_entries FOR EACH ROW EXECUTE FUNCTION protect_wallet_ledger();
 INSERT INTO schema_migrations(version) VALUES (4) ON CONFLICT DO NOTHING;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS article text;
+ALTER TABLE variants ADD COLUMN IF NOT EXISTS barcode text;
+INSERT INTO schema_migrations(version) VALUES (5) ON CONFLICT DO NOTHING;
 `;

@@ -23,6 +23,7 @@ export const products = pgTable("products", {
   category: text("category").notNull(),
   gender: text("gender").notNull(),
   brand: text("brand").notNull(),
+  article: text("article"),
   names: jsonb("names").notNull(),
   description: jsonb("description").notNull(),
   details: jsonb("details").notNull().default([]),
@@ -43,6 +44,7 @@ export const variants = pgTable("variants", {
     .notNull()
     .references(() => products.id),
   size: text("size").notNull(),
+  barcode: text("barcode"),
   color: text("color").notNull(),
 });
 export const inventory = pgTable(

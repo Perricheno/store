@@ -111,6 +111,8 @@ const dict = {
     newPassword: "Новый пароль, от 12 символов",
     category: "Категория",
     brand: "Бренд",
+    article: "Артикул",
+    barcode: "Штрихкод EAN-13",
     sizes: "Размеры через запятую",
     color: "Название цвета",
     quantity: "Количество каждого размера",
@@ -235,6 +237,8 @@ const dict = {
     newPassword: "Жаңа құпиясөз, кемінде 12 таңба",
     category: "Санат",
     brand: "Бренд",
+    article: "Артикул",
+    barcode: "EAN-13 штрихкоды",
     sizes: "Өлшемдер, үтір арқылы",
     color: "Түс атауы",
     quantity: "Әр өлшемнің саны",
@@ -359,6 +363,8 @@ const dict = {
     newPassword: "New password, at least 12 characters",
     category: "Category",
     brand: "Brand",
+    article: "Article",
+    barcode: "EAN-13 barcode",
     sizes: "Sizes, separated by commas",
     color: "Color name",
     quantity: "Quantity per size",
@@ -455,6 +461,7 @@ export function Dashboard() {
   const [users, setUsers] = useState<User[]>([]);
   const [integration, setIntegration] = useState<Record<string, unknown>>({});
   const [editing, setEditing] = useState<Product | null>(null);
+  const [sizeText, setSizeText] = useState("S, M, L, XL");
   const [productDetails, setProductDetails] = useState<
     NonNullable<Product["details"]>
   >([]);
@@ -672,6 +679,7 @@ export function Dashboard() {
   }
   function openProduct(product: Product | null) {
     setEditing(product);
+    setSizeText(product?.sizes.map((v) => v.size).join(", ") || "S, M, L, XL");
     setProductDetails(
       (product?.details || []).map((detail) => ({
         ...detail,
@@ -699,6 +707,7 @@ export function Dashboard() {
           id: editing?.sizes.find((v) => v.size === size)?.id,
           size,
           color: String(f.get("color") || "Black"),
+          barcode: String(f.get(`barcode:${size}`) || "").trim() || null,
           quantity: Number(f.get("quantity")),
         }));
       const saved = await api<Product>("staff/products", "POST", {
@@ -707,6 +716,7 @@ export function Dashboard() {
         category: f.get("category"),
         gender: f.get("gender"),
         brand: f.get("brand"),
+        article: String(f.get("article") || "").trim() || null,
         names: {
           ru: f.get("name-ru"),
           kk: f.get("name-kk"),
@@ -1218,16 +1228,25 @@ export function Dashboard() {
             </label>
           </div>
           <label className={s.field}>
+            {t.article}
+            <input name="article" className={s.input} maxLength={100} defaultValue={editing?.article || ""} />
+          </label>
+          <label className={s.field}>
             {t.sizes}
             <input
               name="sizes"
               className={s.input}
-              defaultValue={
-                editing?.sizes.map((v) => v.size).join(", ") || "S, M, L, XL"
-              }
+              value={sizeText}
+              onChange={(event) => setSizeText(event.target.value)}
               required
             />
           </label>
+          {Array.from(new Set(sizeText.split(",").map((size) => size.trim()).filter(Boolean))).map((size) => (
+            <label className={s.field} key={size}>
+              {t.barcode} — {size}
+              <input name={`barcode:${size}`} className={s.input} inputMode="numeric" pattern="[0-9]{13}" maxLength={13} defaultValue={editing?.sizes.find((v) => v.size === size)?.barcode || ""} />
+            </label>
+          ))}
           <div className={s.row}>
             <label className={s.field}>
               {t.color}

@@ -8,6 +8,7 @@ import {
 } from "node:crypto";
 import { hash, verify } from "@node-rs/argon2";
 import { z } from "zod";
+import { isEan13 } from "./barcode";
 import {
   database,
   transaction,
@@ -247,7 +248,7 @@ async function lockVisitor(db: DB, id: string) {
 async function hydrateProducts(db: DB, rows: Row[]): Promise<Product[]> {
   if (!rows.length) return [];
   const variants = await db.query(
-    "SELECT v.*,COALESCE(SUM(i.quantity-i.reserved),0)::integer AS available FROM variants v LEFT JOIN inventory i ON i.variant_id=v.id WHERE v.product_id=ANY($1::text[]) GROUP BY v.id,v.product_id,v.size,v.color ORDER BY v.id",
+    "SELECT v.*,COALESCE(SUM(i.quantity-i.reserved),0)::integer AS available FROM variants v LEFT JOIN inventory i ON i.variant_id=v.id WHERE v.product_id=ANY($1::text[]) GROUP BY v.id,v.product_id,v.size,v.color,v.barcode ORDER BY v.id",
     [rows.map((row) => row.id)],
   );
   const byProduct = new Map<string, Product["sizes"]>();
@@ -258,6 +259,7 @@ async function hydrateProducts(db: DB, rows: Row[]): Promise<Product[]> {
       size: variant.size,
       color: variant.color,
       available: variant.available,
+      ...(variant.barcode && isEan13(variant.barcode) ? { barcode: variant.barcode } : {}),
     });
     byProduct.set(variant.product_id, sizes);
   }
@@ -267,6 +269,7 @@ async function hydrateProducts(db: DB, rows: Row[]): Promise<Product[]> {
     category: r.category,
     gender: r.gender,
     brand: r.brand,
+    ...(r.article ? { article: r.article } : {}),
     names: r.names,
     description: r.description,
     details: r.details ?? [],
@@ -1171,6 +1174,7 @@ const productInput = z.object({
   category: z.string().trim().min(1).max(80),
   gender: z.enum(["men", "women", "unisex"]),
   brand: z.string().trim().min(1).max(100),
+  article: z.string().trim().max(100).nullable().optional(),
   names: translations,
   description: descriptionTranslations,
   details: z
@@ -1254,6 +1258,7 @@ const productInput = z.object({
       z.object({
         id: z.string().min(1).max(128).optional(),
         size: z.string().trim().min(1).max(32),
+        barcode: z.string().refine(isEan13).nullable().optional(),
         color: z.string().trim().min(1).max(80),
       }),
     )
@@ -1285,7 +1290,7 @@ export async function upsertProduct(
         "Признак демонстрационного товара нельзя менять",
       );
     await db.query(
-      "INSERT INTO products(id,slug,category,gender,brand,names,description,price,old_price,media,kaspi_url,is_demo,published,details,promotion) VALUES($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8,$9,$10::jsonb,$11,$12,$13,$14::jsonb,$15::jsonb) ON CONFLICT(id) DO UPDATE SET slug=EXCLUDED.slug,category=EXCLUDED.category,gender=EXCLUDED.gender,brand=EXCLUDED.brand,names=EXCLUDED.names,description=EXCLUDED.description,price=EXCLUDED.price,old_price=EXCLUDED.old_price,media=EXCLUDED.media,kaspi_url=EXCLUDED.kaspi_url,published=EXCLUDED.published,details=EXCLUDED.details,promotion=EXCLUDED.promotion",
+      "INSERT INTO products(id,slug,category,gender,brand,names,description,price,old_price,media,kaspi_url,is_demo,published,details,promotion,article) VALUES($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8,$9,$10::jsonb,$11,$12,$13,$14::jsonb,$15::jsonb,$16) ON CONFLICT(id) DO UPDATE SET slug=EXCLUDED.slug,category=EXCLUDED.category,gender=EXCLUDED.gender,brand=EXCLUDED.brand,names=EXCLUDED.names,description=EXCLUDED.description,price=EXCLUDED.price,old_price=EXCLUDED.old_price,media=EXCLUDED.media,kaspi_url=EXCLUDED.kaspi_url,published=EXCLUDED.published,details=EXCLUDED.details,promotion=EXCLUDED.promotion,article=EXCLUDED.article",
       [
         id,
         value.slug,
@@ -1306,20 +1311,21 @@ export async function upsertProduct(
             ? (existing?.promotion ?? null)
             : value.promotion,
         ),
+        value.article === undefined ? (existing?.article ?? null) : (value.article || null),
       ],
     );
     const retained: string[] = [];
     for (const size of value.sizes) {
       const vid = size.id || randomUUID();
       const [old] = await db.query(
-        "SELECT product_id FROM variants WHERE id=$1",
+        "SELECT product_id,barcode FROM variants WHERE id=$1",
         [vid],
       );
       if (old && old.product_id !== id)
         fail(400, "VALIDATION", "Вариант принадлежит другому товару");
       await db.query(
-        "INSERT INTO variants(id,product_id,size,color) VALUES($1,$2,$3,$4) ON CONFLICT(id) DO UPDATE SET size=EXCLUDED.size,color=EXCLUDED.color",
-        [vid, id, size.size, size.color],
+        "INSERT INTO variants(id,product_id,size,color,barcode) VALUES($1,$2,$3,$4,$5) ON CONFLICT(id) DO UPDATE SET size=EXCLUDED.size,color=EXCLUDED.color,barcode=EXCLUDED.barcode",
+        [vid, id, size.size, size.color, size.barcode === undefined ? (old?.barcode ?? null) : size.barcode],
       );
       await db.query(
         "INSERT INTO inventory(variant_id,branch_id,quantity,reserved) VALUES($1,'main',0,0) ON CONFLICT DO NOTHING",
