@@ -18,6 +18,7 @@ import { checkoutEnabled, isLocale, indexingEnabled } from "@/lib/config";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import sharp from "sharp";
+import { publicCatalog, publicCart } from "@/lib/public-catalog";
 import { drainTestJobs } from "@/lib/test-worker";
 
 export const runtime = "nodejs";
@@ -79,18 +80,21 @@ async function handler(
     if (path === "products" && method === "GET") {
       const q = request.nextUrl.searchParams;
       return json(
-        await core.getCatalogPage({
-          page: q.has("page") ? Number(q.get("page")) : 1,
-          pageSize: q.has("pageSize") ? Number(q.get("pageSize")) : 24,
-          q: q.get("q") || undefined,
-          category: q.get("category") || undefined,
-          gender: q.get("gender") || undefined,
-          size: q.get("size") || undefined,
-          minPrice: q.has("minPrice") ? Number(q.get("minPrice")) : undefined,
-          maxPrice: q.has("maxPrice") ? Number(q.get("maxPrice")) : undefined,
-          inStock: q.get("available") === "true" || q.get("inStock") === "true",
-          sort: q.get("sort") || undefined,
-        }),
+        publicCatalog(
+          await core.getCatalogPage({
+            page: q.has("page") ? Number(q.get("page")) : 1,
+            pageSize: q.has("pageSize") ? Number(q.get("pageSize")) : 24,
+            q: q.get("q") || undefined,
+            category: q.get("category") || undefined,
+            gender: q.get("gender") || undefined,
+            size: q.get("size") || undefined,
+            minPrice: q.has("minPrice") ? Number(q.get("minPrice")) : undefined,
+            maxPrice: q.has("maxPrice") ? Number(q.get("maxPrice")) : undefined,
+            inStock:
+              q.get("available") === "true" || q.get("inStock") === "true",
+            sort: q.get("sort") || undefined,
+          }),
+        ),
       );
     }
     if (path === "settings" && method === "GET")
@@ -100,7 +104,8 @@ async function handler(
       });
     if (path === "cart") {
       const visitor = await visitorId();
-      if (method === "GET") return json(await core.getCart(visitor));
+      if (method === "GET")
+        return json(publicCart(await core.getCart(visitor)));
       const input = await body(request);
       const quantity =
         method === "POST"
@@ -108,13 +113,17 @@ async function handler(
               (i) => i.variantId === input.variantId,
             )?.quantity || 0) + Number(input.quantity)
           : Number(input.quantity);
-      return json(await core.updateCart(visitor, input.variantId, quantity));
+      return json(
+        publicCart(await core.updateCart(visitor, input.variantId, quantity)),
+      );
     }
     if (path === "favorites") {
       const visitor = await visitorId();
       if (method !== "GET")
         await core.toggleFavorite(visitor, (await body(request)).productId);
-      const products = await core.getFavorites(visitor);
+      const products = (await core.getFavorites(visitor)).map(
+        core.publicProduct,
+      );
       return json({ products, productIds: products.map((p) => p.id) });
     }
     if (path === "checkout" && method === "POST") {

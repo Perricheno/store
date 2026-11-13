@@ -250,6 +250,8 @@ async function hydrateProducts(db: DB, rows: Row[]): Promise<Product[]> {
     brand: r.brand,
     names: r.names,
     description: r.description,
+    details: r.details ?? [],
+    ...(r.promotion ? { promotion: r.promotion } : {}),
     price: r.price,
     ...(r.old_price != null ? { oldPrice: r.old_price } : {}),
     media: r.media,
@@ -997,37 +999,68 @@ export async function getSettings(): Promise<Settings> {
   ).query("SELECT value FROM settings WHERE id='store'");
   return { ...row.value, kazpostEnabled: false };
 }
-const promotionTranslations = z.object({
-  ru: z.string().trim().max(300),
-  kk: z.string().trim().max(300),
-  en: z.string().trim().max(300),
-}).strict();
+const promotionTranslations = z
+  .object({
+    ru: z.string().trim().max(300),
+    kk: z.string().trim().max(300),
+    en: z.string().trim().max(300),
+  })
+  .strict();
 // Root-relative links only. Reject encoded separators and controls as well as
 // their literal forms so browser URL normalization cannot change the origin.
-const promotionHref = z.string().trim().max(500).refine((value) => {
-  if (!value) return true;
-  if (!value.startsWith("/") || value.startsWith("//")) return false;
-  return !/[\\\x00-\x20\x7f]/.test(value) && !/%(?:2f|5c|0[0-9a-f]|1[0-9a-f]|20|7f|25)/i.test(value);
-}, "Use an internal path").optional();
-const announcementInput = z.object({
-  enabled: z.boolean(), text: promotionTranslations, href: promotionHref,
-}).strict().refine((value) => !value.enabled || Object.values(value.text).every(Boolean));
-const bannerInput = z.object({
-  enabled: z.boolean(), title: promotionTranslations, href: promotionHref,
-  imageUrl: z.string().regex(/^\/api\/media\/[a-f0-9]{64}\.webp$/).optional(),
-}).strict().refine((value) => !value.enabled || Object.values(value.title).every(Boolean));
-const contentPageTranslations = z.object({
-  ru: z.string().trim().max(20000),
-  kk: z.string().trim().max(20000),
-  en: z.string().trim().max(20000),
-}).strict();
-const contentPagesInput = z.object({
-  about: contentPageTranslations.optional(),
-  delivery: contentPageTranslations.optional(),
-  returns: contentPageTranslations.optional(),
-  privacy: contentPageTranslations.optional(),
-  terms: contentPageTranslations.optional(),
-}).strict();
+const promotionHref = z
+  .string()
+  .trim()
+  .max(500)
+  .refine((value) => {
+    if (!value) return true;
+    if (!value.startsWith("/") || value.startsWith("//")) return false;
+    return (
+      !/[\\\x00-\x20\x7f]/.test(value) &&
+      !/%(?:2f|5c|0[0-9a-f]|1[0-9a-f]|20|7f|25)/i.test(value)
+    );
+  }, "Use an internal path")
+  .optional();
+const announcementInput = z
+  .object({
+    enabled: z.boolean(),
+    text: promotionTranslations,
+    href: promotionHref,
+  })
+  .strict()
+  .refine(
+    (value) => !value.enabled || Object.values(value.text).every(Boolean),
+  );
+const bannerInput = z
+  .object({
+    enabled: z.boolean(),
+    title: promotionTranslations,
+    href: promotionHref,
+    imageUrl: z
+      .string()
+      .regex(/^\/api\/media\/[a-f0-9]{64}\.webp$/)
+      .optional(),
+  })
+  .strict()
+  .refine(
+    (value) => !value.enabled || Object.values(value.title).every(Boolean),
+  );
+const contentPageTranslations = z
+  .object({
+    ru: z.string().trim().max(20000),
+    kk: z.string().trim().max(20000),
+    en: z.string().trim().max(20000),
+  })
+  .strict();
+const contentPagesInput = z
+  .object({
+    about: contentPageTranslations.optional(),
+    delivery: contentPageTranslations.optional(),
+    returns: contentPageTranslations.optional(),
+    privacy: contentPageTranslations.optional(),
+    terms: contentPageTranslations.optional(),
+  })
+  .strict();
 export async function updateSettings(
   actorId: string,
   input: Settings,
@@ -1065,6 +1098,52 @@ const productInput = z.object({
   brand: z.string().trim().min(1).max(100),
   names: translations,
   description: descriptionTranslations,
+  details: z
+    .array(
+      z.object({
+        key: z
+          .string()
+          .trim()
+          .min(1)
+          .max(64)
+          .regex(/^[a-z][a-z0-9_-]*$/),
+        label: z.object({
+          ru: z.string().trim().min(1).max(100),
+          kk: z.string().trim().min(1).max(100),
+          en: z.string().trim().min(1).max(100),
+        }),
+        value: z.object({
+          ru: z.string().trim().min(1).max(500),
+          kk: z.string().trim().min(1).max(500),
+          en: z.string().trim().min(1).max(500),
+        }),
+        enabled: z.boolean(),
+      }),
+    )
+    .max(12)
+    .refine(
+      (details) =>
+        new Set(details.map((detail) => detail.key)).size === details.length,
+      "Detail keys must be unique",
+    )
+    .optional(),
+  promotion: z
+    .object({
+      enabled: z.boolean(),
+      label: z.object({
+        ru: z.string().trim().max(80),
+        kk: z.string().trim().max(80),
+        en: z.string().trim().max(80),
+      }),
+      percent: z.number().int().min(1).max(99).optional(),
+    })
+    .refine(
+      (promotion) =>
+        !promotion.enabled || Object.values(promotion.label).every(Boolean),
+      "Enabled promotion requires all translations",
+    )
+    .nullable()
+    .optional(),
   price: z.number().int().min(1).max(100000000),
   oldPrice: z.number().int().min(0).max(100000000).optional(),
   media: z
@@ -1131,7 +1210,7 @@ export async function upsertProduct(
         "Признак демонстрационного товара нельзя менять",
       );
     await db.query(
-      "INSERT INTO products(id,slug,category,gender,brand,names,description,price,old_price,media,kaspi_url,is_demo,published) VALUES($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8,$9,$10::jsonb,$11,$12,$13) ON CONFLICT(id) DO UPDATE SET slug=EXCLUDED.slug,category=EXCLUDED.category,gender=EXCLUDED.gender,brand=EXCLUDED.brand,names=EXCLUDED.names,description=EXCLUDED.description,price=EXCLUDED.price,old_price=EXCLUDED.old_price,media=EXCLUDED.media,kaspi_url=EXCLUDED.kaspi_url,published=EXCLUDED.published",
+      "INSERT INTO products(id,slug,category,gender,brand,names,description,price,old_price,media,kaspi_url,is_demo,published,details,promotion) VALUES($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8,$9,$10::jsonb,$11,$12,$13,$14::jsonb,$15::jsonb) ON CONFLICT(id) DO UPDATE SET slug=EXCLUDED.slug,category=EXCLUDED.category,gender=EXCLUDED.gender,brand=EXCLUDED.brand,names=EXCLUDED.names,description=EXCLUDED.description,price=EXCLUDED.price,old_price=EXCLUDED.old_price,media=EXCLUDED.media,kaspi_url=EXCLUDED.kaspi_url,published=EXCLUDED.published,details=EXCLUDED.details,promotion=EXCLUDED.promotion",
       [
         id,
         value.slug,
@@ -1146,6 +1225,12 @@ export async function upsertProduct(
         value.kaspiUrl ?? null,
         value.isDemo,
         value.published,
+        JSON.stringify(value.details ?? existing?.details ?? []),
+        JSON.stringify(
+          value.promotion === undefined
+            ? (existing?.promotion ?? null)
+            : value.promotion,
+        ),
       ],
     );
     const retained: string[] = [];

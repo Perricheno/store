@@ -1159,22 +1159,57 @@ test("store promotions require translated copy and safe local links and media", 
     const updated = await core.updateSettings(actorId, {
       ...previous,
       announcement: { enabled: true, text, href: "/ru/catalog?category=shoes" },
-      banner: { enabled: true, title: text, imageUrl: `/api/media/${"a".repeat(64)}.webp` },
+      banner: {
+        enabled: true,
+        title: text,
+        imageUrl: `/api/media/${"a".repeat(64)}.webp`,
+      },
     });
-    assert.deepEqual((await core.getSettings()).announcement, updated.announcement);
-    for (const href of ["https://example.test", "javascript:alert(1)", "//example.test", "/\\example.test", "/%2fexample.test", "/%255cexample.test", "/x\ny"]) {
-      await assert.rejects(() => core.updateSettings(actorId, {
-        ...previous, announcement: { enabled: true, text, href },
-      }), core.CoreError);
+    assert.deepEqual(
+      (await core.getSettings()).announcement,
+      updated.announcement,
+    );
+    for (const href of [
+      "https://example.test",
+      "javascript:alert(1)",
+      "//example.test",
+      "/\\example.test",
+      "/%2fexample.test",
+      "/%255cexample.test",
+      "/x\ny",
+    ]) {
+      await assert.rejects(
+        () =>
+          core.updateSettings(actorId, {
+            ...previous,
+            announcement: { enabled: true, text, href },
+          }),
+        core.CoreError,
+      );
     }
-    await assert.rejects(() => core.updateSettings(actorId, {
-      ...previous, announcement: { enabled: true, text: { ...text, kk: " " } },
-    }), core.CoreError);
-    await assert.rejects(() => core.updateSettings(actorId, {
-      ...previous, banner: { enabled: true, title: text, imageUrl: "https://example.test/banner.webp" },
-    }), core.CoreError);
+    await assert.rejects(
+      () =>
+        core.updateSettings(actorId, {
+          ...previous,
+          announcement: { enabled: true, text: { ...text, kk: " " } },
+        }),
+      core.CoreError,
+    );
+    await assert.rejects(
+      () =>
+        core.updateSettings(actorId, {
+          ...previous,
+          banner: {
+            enabled: true,
+            title: text,
+            imageUrl: "https://example.test/banner.webp",
+          },
+        }),
+      core.CoreError,
+    );
     const disabled = await core.updateSettings(actorId, {
-      ...previous, announcement: { enabled: false, text: { ru: "", kk: "", en: "" } },
+      ...previous,
+      announcement: { enabled: false, text: { ru: "", kk: "", en: "" } },
     });
     assert.equal(disabled.announcement?.enabled, false);
   } finally {
@@ -1186,11 +1221,24 @@ test("owner content pages persist empty translations and edited plain text with 
   const previous = await core.getSettings();
   try {
     const empty = { ru: "", kk: "", en: "" };
-    const about = { ru: "О магазине\nАдрес и команда", kk: "Дүкен туралы", en: "About the store" };
-    await core.updateSettings(actorId, { ...previous, contentPages: { about: empty, privacy: empty } });
+    const about = {
+      ru: "О магазине\nАдрес и команда",
+      kk: "Дүкен туралы",
+      en: "About the store",
+    };
+    await core.updateSettings(actorId, {
+      ...previous,
+      contentPages: { about: empty, privacy: empty },
+    });
     assert.deepEqual((await core.getSettings()).contentPages?.about, empty);
-    await core.updateSettings(actorId, { ...previous, contentPages: { about, privacy: empty } });
-    assert.deepEqual((await core.getSettings()).contentPages, { about, privacy: empty });
+    await core.updateSettings(actorId, {
+      ...previous,
+      contentPages: { about, privacy: empty },
+    });
+    assert.deepEqual((await core.getSettings()).contentPages, {
+      about,
+      privacy: empty,
+    });
     for (const contentPages of [
       { unknown: empty },
       { about: { ...empty, extra: "unsupported" } },
@@ -1198,9 +1246,97 @@ test("owner content pages persist empty translations and edited plain text with 
       { about: { ...empty, ru: { html: "unsupported" } } },
       { about: { ...empty, en: "x".repeat(20001) } },
     ]) {
-      await assert.rejects(() => core.updateSettings(actorId, { ...previous, contentPages } as unknown as Settings), core.CoreError);
+      await assert.rejects(
+        () =>
+          core.updateSettings(actorId, {
+            ...previous,
+            contentPages,
+          } as unknown as Settings),
+        core.CoreError,
+      );
     }
   } finally {
     await core.updateSettings(actorId, previous);
   }
+});
+
+test("product details and promotion persist while public projection omits disabled fields", async () => {
+  const products = await core.getStaffProducts(actorId);
+  const original = products.find((product) => product.slug === "city-tee")!;
+  assert.equal(original.details.length, 6);
+  const detail = {
+    key: "composition",
+    label: { ru: "Состав", kk: "Құрамы", en: "Composition" },
+    value: { ru: "Хлопок", kk: "Мақта", en: "Cotton" },
+    enabled: false,
+  };
+  const promotion = {
+    enabled: true,
+    label: { ru: "Акция", kk: "Акция", en: "Offer" },
+    percent: 15,
+  };
+  const updated = await core.upsertProduct(actorId, {
+    ...original,
+    details: [detail],
+    promotion,
+  });
+  assert.deepEqual(updated.details, [detail]);
+  assert.equal(updated.promotion?.percent, 15);
+  assert.deepEqual(core.publicProduct(updated).details, []);
+  assert.equal(core.publicProduct(updated).promotion?.percent, 15);
+  const hidden = await core.upsertProduct(actorId, {
+    ...updated,
+    promotion: { ...promotion, enabled: false },
+  });
+  assert.equal("promotion" in core.publicProduct(hidden), false);
+  assert.equal(hidden.promotion?.label.en, "Offer");
+  await assert.rejects(
+    core.upsertProduct(actorId, {
+      ...hidden,
+      promotion: { ...promotion, percent: 100 },
+    }),
+    { code: "VALIDATION" },
+  );
+  await assert.rejects(
+    core.upsertProduct(actorId, { ...hidden, details: [detail, detail] }),
+    { code: "VALIDATION" },
+  );
+  await core.upsertProduct(actorId, original);
+});
+
+test("enriched catalog migration is idempotent and preserves staff edits", async () => {
+  const { seed } = await import("../src/seed");
+  const db = await database();
+  const enriched = await db.query(
+    "SELECT id FROM products WHERE jsonb_array_length(details)=6",
+  );
+  assert.equal(enriched.length, 15);
+  await db.query(
+    "UPDATE products SET description=$1::jsonb WHERE id='demo-essential-tee'",
+    [
+      JSON.stringify({
+        ru: "Описание сотрудника",
+        kk: "Қызметкер сипаттамасы",
+        en: "Staff description",
+      }),
+    ],
+  );
+  await db.query(
+    "DELETE FROM seed_migrations WHERE version='product-details-15-v1'",
+  );
+  await seed(db);
+  const [edited] = await db.query(
+    "SELECT description,details FROM products WHERE id='demo-essential-tee'",
+  );
+  assert.equal(edited.description.en, "Staff description");
+  assert.equal(edited.details.length, 6);
+  await seed(db);
+  assert.equal(
+    (
+      await db.query(
+        "SELECT id FROM products WHERE jsonb_array_length(details)=6",
+      )
+    ).length,
+    15,
+  );
 });

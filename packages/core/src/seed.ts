@@ -1,3 +1,4 @@
+import { enrichedProductDetails, enrichedDescriptions } from "./seed-details";
 import { CATEGORIES } from "./categories";
 import type { Translations } from "./types";
 import type { DB } from "./db";
@@ -512,7 +513,10 @@ export async function seed(db: DB) {
   const claimed = await db.query(
     "INSERT INTO seed_migrations(version) VALUES('demo-catalog-500-v1') ON CONFLICT DO NOTHING RETURNING version",
   );
-  if (!claimed.length) return;
+  if (!claimed.length) {
+    await enrichProducts(db);
+    return;
+  }
   const records = demoRecords(),
     inserted = new Set<string>();
   // Correct only unchanged original fixture branding/discounts, never staff/user catalog data.
@@ -555,6 +559,36 @@ export async function seed(db: DB) {
     await db.query(
       `INSERT INTO inventory(variant_id,branch_id,quantity,reserved) SELECT x.id,'main',x.quantity,0 FROM jsonb_to_recordset($1::jsonb) AS x(id text,quantity integer) ON CONFLICT DO NOTHING`,
       [batch],
+    );
+  }
+  await enrichProducts(db);
+}
+
+async function enrichProducts(db: DB) {
+  const claimed = await db.query(
+    "INSERT INTO seed_migrations(version) VALUES('product-details-15-v1') ON CONFLICT DO NOTHING RETURNING version",
+  );
+  if (!claimed.length) return;
+  const records = demoRecords().filter(
+    (record) => enrichedProductDetails[record.slug],
+  );
+  for (const record of records) {
+    // Match the full unchanged sample identity/content before enriching; staff edits win.
+    await db.query(
+      `UPDATE products SET details=$1::jsonb,description=$2::jsonb WHERE id=$3 AND slug=$4 AND is_demo=true AND names=$5::jsonb AND description=$6::jsonb AND category=$7 AND gender=$8 AND brand=$9 AND price=$10 AND media=$11::jsonb AND old_price IS NULL AND kaspi_url IS NULL AND published=true AND details='[]'::jsonb AND promotion IS NULL AND NOT EXISTS (SELECT 1 FROM audit WHERE entity_id=$3 AND action IN ('product.updated','product.created'))`,
+      [
+        JSON.stringify(enrichedProductDetails[record.slug]),
+        JSON.stringify(enrichedDescriptions[record.slug]),
+        record.id,
+        record.slug,
+        JSON.stringify(record.names),
+        JSON.stringify(record.description),
+        record.category,
+        record.gender,
+        record.brand,
+        record.price,
+        JSON.stringify(record.media),
+      ],
     );
   }
 }

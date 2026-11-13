@@ -21,4 +21,7 @@ INSERT INTO schema_migrations(version) VALUES (1) ON CONFLICT DO NOTHING;
 ALTER TABLE payments ADD COLUMN IF NOT EXISTS last_checked_at timestamptz;
 CREATE INDEX IF NOT EXISTS payments_reconciliation_idx ON payments(last_checked_at,created_at,id) WHERE invoice_id IS NOT NULL AND status<>'refunded';
 INSERT INTO schema_migrations(version) VALUES (2) ON CONFLICT DO NOTHING;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS details jsonb NOT NULL DEFAULT '[]';
+ALTER TABLE products ADD COLUMN IF NOT EXISTS promotion jsonb;
+INSERT INTO schema_migrations(version) VALUES (3) ON CONFLICT DO NOTHING;
 `;

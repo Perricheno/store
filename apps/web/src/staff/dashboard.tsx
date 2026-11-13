@@ -31,6 +31,20 @@ type Job = {
 
 const dict = {
   ru: {
+    productDetails: "Характеристики товара",
+    addDetail: "Добавить характеристику",
+    detailLabel: "Название характеристики",
+    detailValue: "Значение",
+    showDetail: "Показывать характеристику",
+    removeDetail: "Удалить характеристику",
+    detailHint:
+      "Скрытые характеристики сохраняются, но не отображаются покупателям. Заполните название и значение на трёх языках.",
+    productPromotion: "Акционный бейдж",
+    showProductPromotion: "Показывать бейдж",
+    badgeLabel: "Текст бейджа",
+    badgePercent: "Процент (необязательно)",
+    badgeHint:
+      "Бейдж не изменяет цену товара. Процент — целое число от 1 до 99.",
     contentPages: "Страницы",
     contentPage: "Страница",
     pageAbout: "О магазине",
@@ -137,6 +151,20 @@ const dict = {
     noJobs: "Нет ожидающих или завершившихся с ошибкой задач",
   },
   kk: {
+    productDetails: "Тауар сипаттамалары",
+    addDetail: "Сипаттама қосу",
+    detailLabel: "Сипаттама атауы",
+    detailValue: "Мәні",
+    showDetail: "Сипаттаманы көрсету",
+    removeDetail: "Сипаттаманы жою",
+    detailHint:
+      "Жасырын сипаттамалар сақталады, бірақ сатып алушыларға көрсетілмейді. Сипаттамалардың атауы мен мәнін үш тілде толтырыңыз.",
+    productPromotion: "Акциялық белгі",
+    showProductPromotion: "Белгіні көрсету",
+    badgeLabel: "Белгі мәтіні",
+    badgePercent: "Пайыз (міндетті емес)",
+    badgeHint:
+      "Белгі тауар бағасын өзгертпейді. Пайыз — 1 мен 99 арасындағы бүтін сан.",
     contentPages: "Беттер",
     contentPage: "Бет",
     pageAbout: "Дүкен туралы",
@@ -243,6 +271,20 @@ const dict = {
     noJobs: "Күтіп тұрған немесе қатемен аяқталған тапсырмалар жоқ",
   },
   en: {
+    productDetails: "Product characteristics",
+    addDetail: "Add characteristic",
+    detailLabel: "Characteristic name",
+    detailValue: "Value",
+    showDetail: "Show characteristic",
+    removeDetail: "Remove characteristic",
+    detailHint:
+      "Hidden characteristics are saved but not shown to shoppers. Fill in the name and value in all three languages.",
+    productPromotion: "Promotion badge",
+    showProductPromotion: "Show badge",
+    badgeLabel: "Badge text",
+    badgePercent: "Percentage (optional)",
+    badgeHint:
+      "The badge does not change the product price. Percentage must be a whole number from 1 to 99.",
     contentPages: "Pages",
     contentPage: "Page",
     pageAbout: "About the store",
@@ -389,13 +431,21 @@ export function Dashboard() {
     currentProductPage * 24,
   );
   const [orders, setOrders] = useState<Order[]>([]);
-  const [contentPage, setContentPage] = useState<"about" | "delivery" | "returns" | "privacy" | "terms">("about");
+  const [contentPage, setContentPage] = useState<
+    "about" | "delivery" | "returns" | "privacy" | "terms"
+  >("about");
   const [contentDraft, setContentDraft] = useState<Settings["contentPages"]>();
   const [bannerImage, setBannerImage] = useState<string | undefined>();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [integration, setIntegration] = useState<Record<string, unknown>>({});
   const [editing, setEditing] = useState<Product | null>(null);
+  const [productDetails, setProductDetails] = useState<
+    NonNullable<Product["details"]>
+  >([]);
+  const [productPromotion, setProductPromotion] = useState<
+    NonNullable<Product["promotion"]>
+  >({ enabled: false, label: { ru: "", kk: "", en: "" } });
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const staffDialog = useRef<HTMLDialogElement>(null);
@@ -606,6 +656,18 @@ export function Dashboard() {
   }
   function openProduct(product: Product | null) {
     setEditing(product);
+    setProductDetails(
+      (product?.details || []).map((detail) => ({
+        ...detail,
+        label: { ...detail.label },
+        value: { ...detail.value },
+      })),
+    );
+    setProductPromotion(
+      product?.promotion
+        ? { ...product.promotion, label: { ...product.promotion.label } }
+        : { enabled: false, label: { ru: "", kk: "", en: "" } },
+    );
     setMedia(product?.media || []);
     dialog.current?.showModal();
   }
@@ -639,6 +701,8 @@ export function Dashboard() {
           kk: f.get("description-kk"),
           en: f.get("description-en"),
         },
+        details: productDetails,
+        promotion: productPromotion,
         price: Number(f.get("price")),
         oldPrice: f.get("oldPrice") ? Number(f.get("oldPrice")) : undefined,
         media,
@@ -895,14 +959,26 @@ export function Dashboard() {
                       contentPages: contentDraft ?? settings.contentPages,
                       announcement: {
                         enabled: f.get("announcementEnabled") === "on",
-                        text: Object.fromEntries((["ru", "kk", "en"] as const).map((language) => [language, String(f.get(`announcement_${language}`) || "")])),
+                        text: Object.fromEntries(
+                          (["ru", "kk", "en"] as const).map((language) => [
+                            language,
+                            String(f.get(`announcement_${language}`) || ""),
+                          ]),
+                        ),
                         href: String(f.get("announcementHref") || ""),
                       },
                       banner: {
                         enabled: f.get("bannerEnabled") === "on",
-                        title: Object.fromEntries((["ru", "kk", "en"] as const).map((language) => [language, String(f.get(`banner_${language}`) || "")])),
+                        title: Object.fromEntries(
+                          (["ru", "kk", "en"] as const).map((language) => [
+                            language,
+                            String(f.get(`banner_${language}`) || ""),
+                          ]),
+                        ),
                         href: String(f.get("bannerHref") || ""),
-                        imageUrl: (bannerImage ?? settings.banner?.imageUrl) || undefined,
+                        imageUrl:
+                          (bannerImage ?? settings.banner?.imageUrl) ||
+                          undefined,
                       },
                     }),
                   );
@@ -926,70 +1002,171 @@ export function Dashboard() {
                 ),
               )}
               {(["announcement", "banner"] as const).map((kind) => (
-                <fieldset className={s.promotionFields} key={kind} disabled={user.role !== "owner" || busy}>
+                <fieldset
+                  className={s.promotionFields}
+                  key={kind}
+                  disabled={user.role !== "owner" || busy}
+                >
                   <legend>{t[kind]}</legend>
                   <label className={s.checks}>
-                    <input type="checkbox" name={`${kind}Enabled`} defaultChecked={settings[kind]?.enabled ?? false} />
+                    <input
+                      type="checkbox"
+                      name={`${kind}Enabled`}
+                      defaultChecked={settings[kind]?.enabled ?? false}
+                    />
                     {t.showPromotion}
                   </label>
                   <p className={s.muted}>{t.promotionHint}</p>
                   {(["ru", "kk", "en"] as const).map((language) => (
                     <label className={s.field} key={language}>
                       {language.toUpperCase()}
-                      <input className={s.input} name={`${kind}_${language}`} maxLength={300}
-                        defaultValue={kind === "announcement" ? settings.announcement?.text[language] : settings.banner?.title[language]} />
+                      <input
+                        className={s.input}
+                        name={`${kind}_${language}`}
+                        maxLength={300}
+                        defaultValue={
+                          kind === "announcement"
+                            ? settings.announcement?.text[language]
+                            : settings.banner?.title[language]
+                        }
+                      />
                     </label>
                   ))}
                   <label className={s.field}>
                     {t.promotionLink}
-                    <input className={s.input} name={`${kind}Href`} maxLength={500} placeholder="/ru" defaultValue={settings[kind]?.href} />
+                    <input
+                      className={s.input}
+                      name={`${kind}Href`}
+                      maxLength={500}
+                      placeholder="/ru"
+                      defaultValue={settings[kind]?.href}
+                    />
                   </label>
-                  {kind === "banner" && <>
-                    <label className={s.field}>{t.bannerImage}
-                      <input className={s.input} type="file" accept="image/jpeg,image/png,image/webp,image/avif" onChange={async (event) => {
-                        const file = event.target.files?.[0];
-                        if (!file) return;
-                        await run(async () => {
-                          const form = new FormData();
-                          form.set("file", file);
-                          const response = await fetch("/api/staff/uploads", { method: "POST", body: form });
-                          const data = await response.json();
-                          if (!response.ok) throw new Error(data.error);
-                          setBannerImage(data.url);
-                        });
-                        event.target.value = "";
-                      }} />
-                    </label>
-                    {(bannerImage ?? settings.banner?.imageUrl) && <div className={s.bannerPreview}>
-                      <img src={bannerImage ?? settings.banner?.imageUrl} alt="" />
-                      <button type="button" className={s.button} onClick={() => {
-                        setBannerImage("");
-                        setSettings((current) => current ? { ...current, banner: current.banner ? { ...current.banner, imageUrl: undefined } : undefined } : current);
-                      }}>{t.removeImage}</button>
-                    </div>}
-                  </>}
+                  {kind === "banner" && (
+                    <>
+                      <label className={s.field}>
+                        {t.bannerImage}
+                        <input
+                          className={s.input}
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,image/avif"
+                          onChange={async (event) => {
+                            const file = event.target.files?.[0];
+                            if (!file) return;
+                            await run(async () => {
+                              const form = new FormData();
+                              form.set("file", file);
+                              const response = await fetch(
+                                "/api/staff/uploads",
+                                { method: "POST", body: form },
+                              );
+                              const data = await response.json();
+                              if (!response.ok) throw new Error(data.error);
+                              setBannerImage(data.url);
+                            });
+                            event.target.value = "";
+                          }}
+                        />
+                      </label>
+                      {(bannerImage ?? settings.banner?.imageUrl) && (
+                        <div className={s.bannerPreview}>
+                          <img
+                            src={bannerImage ?? settings.banner?.imageUrl}
+                            alt=""
+                          />
+                          <button
+                            type="button"
+                            className={s.button}
+                            onClick={() => {
+                              setBannerImage("");
+                              setSettings((current) =>
+                                current
+                                  ? {
+                                      ...current,
+                                      banner: current.banner
+                                        ? {
+                                            ...current.banner,
+                                            imageUrl: undefined,
+                                          }
+                                        : undefined,
+                                    }
+                                  : current,
+                              );
+                            }}
+                          >
+                            {t.removeImage}
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </fieldset>
               ))}
               <details className={s.contentEditor}>
                 <summary>{t.contentPages}</summary>
-                <label className={s.field}>{t.contentPage}
-                  <select className={s.select} value={contentPage} onChange={(event) => setContentPage(event.target.value as typeof contentPage)}>
-                    {(["about", "delivery", "returns", "privacy", "terms"] as const).map((key, index) =>
-                      <option value={key} key={key}>{[t.pageAbout, t.pageDelivery, t.pageReturns, t.pagePrivacy, t.pageTerms][index]}</option>)}
+                <label className={s.field}>
+                  {t.contentPage}
+                  <select
+                    className={s.select}
+                    value={contentPage}
+                    onChange={(event) =>
+                      setContentPage(event.target.value as typeof contentPage)
+                    }
+                  >
+                    {(
+                      [
+                        "about",
+                        "delivery",
+                        "returns",
+                        "privacy",
+                        "terms",
+                      ] as const
+                    ).map((key, index) => (
+                      <option value={key} key={key}>
+                        {
+                          [
+                            t.pageAbout,
+                            t.pageDelivery,
+                            t.pageReturns,
+                            t.pagePrivacy,
+                            t.pageTerms,
+                          ][index]
+                        }
+                      </option>
+                    ))}
                   </select>
                 </label>
                 {(["ru", "kk", "en"] as const).map((language) => (
-                  <label className={s.field} key={language}>{language.toUpperCase()}
-                    <textarea className={s.input} name={`content_${contentPage}_${language}`} rows={6} maxLength={20000}
+                  <label className={s.field} key={language}>
+                    {language.toUpperCase()}
+                    <textarea
+                      className={s.input}
+                      name={`content_${contentPage}_${language}`}
+                      rows={6}
+                      maxLength={20000}
                       disabled={user.role !== "owner" || busy}
-                      value={(contentDraft ?? settings.contentPages)?.[contentPage]?.[language] ?? ""}
+                      value={
+                        (contentDraft ?? settings.contentPages)?.[
+                          contentPage
+                        ]?.[language] ?? ""
+                      }
                       onChange={(event) => {
                         const value = event.target.value;
                         setContentDraft((current) => {
                           const pages = current ?? settings.contentPages ?? {};
-                          return { ...pages, [contentPage]: { ru: "", kk: "", en: "", ...pages[contentPage], [language]: value } };
+                          return {
+                            ...pages,
+                            [contentPage]: {
+                              ru: "",
+                              kk: "",
+                              en: "",
+                              ...pages[contentPage],
+                              [language]: value,
+                            },
+                          };
                         });
-                      }} />
+                      }}
+                    />
                   </label>
                 ))}
               </details>
@@ -1255,6 +1432,175 @@ export function Dashboard() {
               />
             </label>
           ))}
+          <fieldset className={s.productFields} disabled={busy}>
+            <legend>{t.productDetails}</legend>
+            <p className={s.fieldHint}>{t.detailHint}</p>
+            {productDetails.map((detail, index) => (
+              <fieldset className={s.detailRow} key={detail.key}>
+                <legend>
+                  {t.productDetails} · {index + 1}
+                </legend>
+                <div className={s.detailActions}>
+                  <label className={s.detailToggle}>
+                    <input
+                      type="checkbox"
+                      checked={detail.enabled}
+                      onChange={(event) =>
+                        setProductDetails((rows) =>
+                          rows.map((row) =>
+                            row.key === detail.key
+                              ? { ...row, enabled: event.target.checked }
+                              : row,
+                          ),
+                        )
+                      }
+                    />
+                    {t.showDetail}
+                  </label>
+                  <button
+                    type="button"
+                    className={s.button}
+                    aria-label={`${t.removeDetail} ${index + 1}`}
+                    onClick={() =>
+                      setProductDetails((rows) =>
+                        rows.filter((row) => row.key !== detail.key),
+                      )
+                    }
+                  >
+                    {t.removeDetail}
+                  </button>
+                </div>
+                {(["ru", "kk", "en"] as const).map((locale) => (
+                  <div className={s.row} key={locale}>
+                    <label className={s.field}>
+                      {t.detailLabel} · {locale.toUpperCase()}
+                      <input
+                        className={s.input}
+                        value={detail.label[locale]}
+                        required
+                        maxLength={100}
+                        onChange={(event) =>
+                          setProductDetails((rows) =>
+                            rows.map((row) =>
+                              row.key === detail.key
+                                ? {
+                                    ...row,
+                                    label: {
+                                      ...row.label,
+                                      [locale]: event.target.value,
+                                    },
+                                  }
+                                : row,
+                            ),
+                          )
+                        }
+                      />
+                    </label>
+                    <label className={s.field}>
+                      {t.detailValue} · {locale.toUpperCase()}
+                      <input
+                        className={s.input}
+                        value={detail.value[locale]}
+                        required
+                        maxLength={500}
+                        onChange={(event) =>
+                          setProductDetails((rows) =>
+                            rows.map((row) =>
+                              row.key === detail.key
+                                ? {
+                                    ...row,
+                                    value: {
+                                      ...row.value,
+                                      [locale]: event.target.value,
+                                    },
+                                  }
+                                : row,
+                            ),
+                          )
+                        }
+                      />
+                    </label>
+                  </div>
+                ))}
+              </fieldset>
+            ))}
+            <button
+              type="button"
+              className={s.button}
+              disabled={productDetails.length >= 12}
+              onClick={() =>
+                setProductDetails((rows) => [
+                  ...rows,
+                  {
+                    key: `detail_${crypto.randomUUID()}`,
+                    enabled: true,
+                    label: { ru: "", kk: "", en: "" },
+                    value: { ru: "", kk: "", en: "" },
+                  },
+                ])
+              }
+            >
+              <PlusIcon size={18} aria-hidden="true" />
+              {t.addDetail}
+            </button>
+          </fieldset>
+          <fieldset className={s.productFields} disabled={busy}>
+            <legend>{t.productPromotion}</legend>
+            <label className={s.detailToggle}>
+              <input
+                type="checkbox"
+                checked={productPromotion.enabled}
+                onChange={(event) =>
+                  setProductPromotion((promotion) => ({
+                    ...promotion,
+                    enabled: event.target.checked,
+                  }))
+                }
+              />
+              {t.showProductPromotion}
+            </label>
+            {(["ru", "kk", "en"] as const).map((locale) => (
+              <label className={s.field} key={locale}>
+                {t.badgeLabel} · {locale.toUpperCase()}
+                <input
+                  className={s.input}
+                  value={productPromotion.label[locale]}
+                  required={productPromotion.enabled}
+                  maxLength={80}
+                  onChange={(event) =>
+                    setProductPromotion((promotion) => ({
+                      ...promotion,
+                      label: {
+                        ...promotion.label,
+                        [locale]: event.target.value,
+                      },
+                    }))
+                  }
+                />
+              </label>
+            ))}
+            <label className={s.field}>
+              {t.badgePercent}
+              <input
+                className={s.input}
+                type="number"
+                min={1}
+                max={99}
+                step={1}
+                value={productPromotion.percent ?? ""}
+                onChange={(event) =>
+                  setProductPromotion((promotion) => ({
+                    ...promotion,
+                    percent:
+                      event.target.value === ""
+                        ? undefined
+                        : Number(event.target.value),
+                  }))
+                }
+              />
+            </label>
+            <p className={s.fieldHint}>{t.badgeHint}</p>
+          </fieldset>
           <label className={s.field}>
             {t.kaspi}
             <input

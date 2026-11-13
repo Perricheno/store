@@ -7,6 +7,17 @@ export interface User {
   role: Role;
   mustChangePassword: boolean;
 }
+export interface ProductDetail {
+  key: string;
+  label: Translations;
+  value: Translations;
+  enabled: boolean;
+}
+export interface ProductPromotion {
+  enabled: boolean;
+  label: Translations;
+  percent?: number;
+}
 export interface Product {
   id: string;
   slug: string;
@@ -15,6 +26,8 @@ export interface Product {
   brand: string;
   names: Translations;
   description: Translations;
+  details: ProductDetail[];
+  promotion?: ProductPromotion;
   price: number;
   oldPrice?: number;
   media: string[];
@@ -65,9 +78,23 @@ export interface Order {
   paymentStatus?: string;
 }
 export interface Settings {
-  contentPages?: Partial<Record<"about" | "delivery" | "returns" | "privacy" | "terms", Record<Locale, string>>>;
-  announcement?: { enabled: boolean; text: Record<Locale, string>; href?: string };
-  banner?: { enabled: boolean; title: Record<Locale, string>; imageUrl?: string; href?: string };
+  contentPages?: Partial<
+    Record<
+      "about" | "delivery" | "returns" | "privacy" | "terms",
+      Record<Locale, string>
+    >
+  >;
+  announcement?: {
+    enabled: boolean;
+    text: Record<Locale, string>;
+    href?: string;
+  };
+  banner?: {
+    enabled: boolean;
+    title: Record<Locale, string>;
+    imageUrl?: string;
+    href?: string;
+  };
   pickupCity: string;
   pickupAddress: string;
   pickupHours: string;
@@ -96,4 +123,14 @@ export interface CatalogPage {
   page: number;
   pageSize: number;
   hasMore: boolean;
+}
+
+/** Public responses omit disabled fields while staff records retain editable values. */
+export function publicProduct(product: Product): Product {
+  const { promotion, ...rest } = product;
+  return {
+    ...rest,
+    details: product.details.filter((detail) => detail.enabled),
+    ...(promotion?.enabled ? { promotion } : {}),
+  };
 }

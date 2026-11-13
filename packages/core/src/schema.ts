@@ -25,6 +25,8 @@ export const products = pgTable("products", {
   brand: text("brand").notNull(),
   names: jsonb("names").notNull(),
   description: jsonb("description").notNull(),
+  details: jsonb("details").notNull().default([]),
+  promotion: jsonb("promotion"),
   price: integer("price").notNull(),
   oldPrice: integer("old_price"),
   media: jsonb("media").notNull(),
