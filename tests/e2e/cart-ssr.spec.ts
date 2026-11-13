@@ -1,10 +1,8 @@
 import { expect, test } from "@playwright/test";
 import type { Product } from "@urbanmag/core";
 
-test.describe("cart data in streamed server HTML", () => {
-  // Next loading.tsx streams completed content into a hidden segment and uses
-  // inline JavaScript to reveal it. With JavaScript disabled, assert that the
-  // server supplied actual DOM content; visibility is a separate browser contract.
+test.describe("server-rendered cart without JavaScript", () => {
+  // Initial cart data must be readable before client hydration.
   test.use({ javaScriptEnabled: false });
 
   test("empty cart and checkout HTML contain initial state without creating a visitor", async ({
@@ -16,7 +14,7 @@ test.describe("cart data in streamed server HTML", () => {
       expect(response?.status()).toBe(200);
       await expect(
         page.getByText("Ваша корзина пока пуста", { exact: true }),
-      ).toHaveCount(1);
+      ).toBeVisible();
       expect(
         (await context.cookies()).some((cookie) =>
           cookie.name.includes("urbanmag_visitor"),
@@ -43,7 +41,7 @@ test.describe("cart data in streamed server HTML", () => {
     expect(response?.status()).toBe(200);
     await expect(
       page.getByText("Ваша корзина пока пуста", { exact: true }),
-    ).toHaveCount(1);
+    ).toBeVisible();
     expect(
       (await context.cookies()).find(
         (cookie) => cookie.name === "__Host-urbanmag_visitor",
@@ -82,13 +80,13 @@ test.describe("cart data in streamed server HTML", () => {
       expect(response?.status()).toBe(200);
       await expect(
         page.getByText(product!.names.ru, { exact: route === "cart" }).first(),
-      ).toHaveCount(1);
+      ).toBeVisible();
       await expect(
         page.getByText("Ваша корзина пока пуста", { exact: true }),
       ).toHaveCount(0);
     }
     await expect(
       page.locator('input[type="email"][aria-label="Email"]'),
-    ).toHaveCount(1);
+    ).toBeVisible();
   });
 });

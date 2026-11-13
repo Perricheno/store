@@ -25,9 +25,11 @@ test("product without a photo remains visible with reduced motion", async ({
 }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/ru/p/city-tee");
-  const visual = page.locator('article svg[role="img"]').first();
+  const visual = page.locator('article div[role="img"]').first();
   await expect(visual).toBeVisible();
-  const gleam = visual.locator('g[mask] rect[class*="gleam"]');
+  const gleam = visual.locator(
+    'span[class*="categoryMask"] span[class*="gleam"]',
+  );
   await expect(gleam).toBeHidden();
   await expect(gleam).toHaveCSS("animation-name", "none");
 });
@@ -196,12 +198,15 @@ test("loading gleam is masked to the category icon and remains on photo failure"
   const card = page
     .locator("article")
     .filter({ has: page.locator('img[src="/slow-photo.png"]') });
-  const gleam = card.locator('svg g[mask] rect[class*="gleam"]');
-  await expect(gleam).toBeVisible();
-  expect(await gleam.locator("..").getAttribute("mask")).toMatch(
-    /^url\(#.+\)$/,
+  const gleam = card.locator(
+    'span[class*="categoryMask"] span[class*="gleam"]',
   );
-  await expect(card.locator("svg mask svg")).toHaveCount(1);
+  await expect(gleam).toBeVisible();
+  await expect(gleam.locator("..")).toHaveCSS(
+    "mask-image",
+    /data:image\/svg\+xml/,
+  );
+  await expect(card.locator("svg mask")).toHaveCount(0);
   const cardHref = await card
     .locator('a[href*="/p/"]')
     .first()
@@ -212,9 +217,9 @@ test("loading gleam is masked to the category icon and remains on photo failure"
     .filter({ has: page.locator(`a[href="${cardHref}"]`) });
   await expect(failedCard.locator('img[src="/slow-photo.png"]')).toHaveCount(0);
   await expect(
-    failedCard.locator('svg g[mask] rect[class*="gleam"]'),
+    failedCard.locator('span[class*="categoryMask"] span[class*="gleam"]'),
   ).toBeVisible();
-  await expect(failedCard.locator('svg[role="img"]')).toBeVisible();
+  await expect(failedCard.locator('div[role="img"]')).toBeVisible();
 });
 
 test("checkout requires a new confirmation after the price changes", async ({

@@ -6,11 +6,11 @@ import {
   memo,
   useCallback,
   useEffect,
-  useId,
   useRef,
   useState,
   type FormEvent,
   type ReactNode,
+  type CSSProperties,
 } from "react";
 import {
   ArrowLeft,
@@ -27,20 +27,8 @@ import {
   User,
   X,
   SignOut,
-  Sneaker,
-  Basketball,
   CoatHanger,
-  TShirt,
-  Pants,
-  Beanie,
-  Backpack,
-  ShirtFolded,
-  Sock,
-  Sunglasses,
   SquaresFour,
-  ThermometerCold,
-  Hoodie,
-  PersonSimpleRun,
   CaretLeft,
   CaretRight,
   type Icon,
@@ -56,6 +44,8 @@ import {
 } from "../lib/categories";
 import { InstallApp } from "./install-app";
 import s from "./shop.module.css";
+import { categoryIcons } from "../lib/category-icons";
+import { categoryMasks } from "../lib/category-masks";
 import { ensureVisitor } from "../lib/visitor-client";
 
 export type { Product } from "@urbanmag/core";
@@ -67,6 +57,23 @@ export type ShopSettings = {
   kazpostEnabled?: boolean;
   phone?: string;
   email?: string;
+  contentPages?: Partial<
+    Record<
+      "about" | "delivery" | "returns" | "privacy" | "terms",
+      Record<Locale, string>
+    >
+  >;
+  announcement?: {
+    enabled: boolean;
+    text: Record<Locale, string>;
+    href?: string;
+  };
+  banner?: {
+    enabled: boolean;
+    title: Record<Locale, string>;
+    imageUrl?: string;
+    href?: string;
+  };
 };
 type Common = { locale: Locale; settings?: ShopSettings; initialCart?: Cart };
 export type Cart = {
@@ -92,25 +99,6 @@ type Order = {
   invoiceUrl?: string;
 };
 const emptyCart: Cart = { items: [], total: 0 };
-const categoryIcons: Record<string, Icon> = {
-  sneakers: Sneaker,
-  "basketball-shoes": Basketball,
-  outerwear: CoatHanger,
-  hoodies: Hoodie,
-  tracksuits: PersonSimpleRun,
-  "t-shirts": TShirt,
-  trousers: Pants,
-  thermalwear: ThermometerCold,
-  beanies: Beanie,
-  backpacks: Backpack,
-  shirts: ShirtFolded,
-  sweatshirts: Hoodie,
-  shorts: Pants,
-  polos: TShirt,
-  socks: Sock,
-  vests: CoatHanger,
-  accessories: Sunglasses,
-};
 const catalogCopy = {
   ru: {
     loadMore: "Показать ещё",
@@ -398,6 +386,7 @@ export function StoreHeader({ locale, initialCart }: Common) {
             href={href}
             prefetch={false}
             aria-current={active ? "page" : undefined}
+            aria-label={label}
           >
             <span className={s.navIcon}>
               <NavIcon size={25} weight="bold" />
@@ -407,46 +396,181 @@ export function StoreHeader({ locale, initialCart }: Common) {
                 </span>
               )}
             </span>
-            <span>{label}</span>
+            <span>{href.endsWith("/account") ? t.profile : label}</span>
           </Link>
         ))}
       </nav>
     </>
   );
 }
+function actualContact(value: unknown, locale: Locale) {
+  const text = localized(value, locale).trim();
+  return /уточняется|to be confirmed|нақтылан/i.test(text) ? "" : text;
+}
+function ContactDetails({ locale, settings }: Common) {
+  const address = actualContact(
+    settings?.pickupAddress || settings?.address,
+    locale,
+  );
+  const hours = actualContact(settings?.pickupHours, locale);
+  const phone = actualContact(settings?.phone, locale);
+  const email = actualContact(settings?.email, locale);
+  return (
+    <div className={s.contactDetails}>
+      {phone && <a href={`tel:${phone.replace(/[^+\d]/g, "")}`}>{phone}</a>}
+      {email && <a href={`mailto:${email}`}>{email}</a>}
+      {address && (
+        <p>
+          <MapPin size={18} weight="bold" aria-hidden="true" />
+          {address}
+        </p>
+      )}
+      {hours && <p>{hours}</p>}
+    </div>
+  );
+}
 export function StoreFooter({ locale, settings }: Common) {
   const t = dictionary(locale);
   return (
     <footer className={s.footer}>
-      <div className={s.footerMain}>
-        <Link prefetch={false} className={s.footerLogo} href={`/${locale}`}>
-          URBAN/MAG
-        </Link>
-        <p>
-          <MapPin size={17} weight="bold" />
-          {pickupAddress(settings, locale)}
-        </p>
-        {settings?.email && (
-          <a href={`mailto:${settings.email}`}>{settings.email}</a>
-        )}
-      </div>
-      <nav className={s.footerCategories} aria-label={t.catalog}>
-        {CATEGORIES.map((c) => (
-          <Link prefetch={false} key={c.id} href={`/${locale}/c/${c.id}`}>
-            {c.names[locale]}
+      <div className={s.footerGroups}>
+        <div className={s.footerIdentity}>
+          <Link prefetch={false} className={s.footerLogo} href={`/${locale}`}>
+            URBAN/MAG
           </Link>
-        ))}
-      </nav>
+          <ContactDetails locale={locale} settings={settings} />
+        </div>
+        <nav aria-label={t.footerCustomers}>
+          <h2>{t.footerCustomers}</h2>
+          {[
+            ["contacts", t.contacts],
+            ["about", t.footerAbout],
+            ["delivery", t.footerDelivery],
+            ["returns", t.footerReturns],
+          ].map(([path, label]) => (
+            <Link key={path} prefetch={false} href={`/${locale}/${path}`}>
+              {label}
+            </Link>
+          ))}
+        </nav>
+        <nav aria-label={t.footerLegal}>
+          <h2>{t.footerLegal}</h2>
+          {[
+            ["privacy", t.footerPrivacy],
+            ["terms", t.footerTerms],
+            ["cookies", t.cookies],
+          ].map(([path, label]) => (
+            <Link key={path} prefetch={false} href={`/${locale}/${path}`}>
+              {label}
+            </Link>
+          ))}
+        </nav>
+      </div>
       <div className={s.footerBottom}>
         <span>© {new Date().getFullYear()} URBANMAG</span>
-        <span>{t.cookieNote}</span>
-        <Link prefetch={false} href={`/${locale}/cookies`}>
-          {t.cookies} <ArrowRight size={14} />
-        </Link>
       </div>
     </footer>
   );
 }
+export function StoreInformation({
+  locale,
+  settings,
+  infoPage,
+}: Common & {
+  infoPage: "contacts" | "about" | "delivery" | "returns" | "privacy" | "terms";
+}) {
+  const t = dictionary(locale);
+  const title = {
+    contacts: t.contacts,
+    about: t.footerAbout,
+    delivery: t.footerDelivery,
+    returns: t.footerReturns,
+    privacy: t.footerPrivacy,
+    terms: t.footerTerms,
+  }[infoPage];
+  const body =
+    infoPage === "contacts"
+      ? ""
+      : localized(settings?.contentPages?.[infoPage], locale).trim();
+  return (
+    <ShopShell locale={locale} settings={settings}>
+      <article className={s.informationPage}>
+        <h1>
+          {title}
+          <span className={s.titleDot}>.</span>
+        </h1>
+        {infoPage === "contacts" ? (
+          <ContactDetails locale={locale} settings={settings} />
+        ) : (
+          body && <div className={s.informationBody}>{body}</div>
+        )}
+      </article>
+    </ShopShell>
+  );
+}
+function StorePromotions({ locale, settings }: Common) {
+  const t = dictionary(locale);
+  const announcement = settings?.announcement;
+  const banner = settings?.banner;
+  const text = localized(announcement?.text, locale).trim();
+  const title = localized(banner?.title, locale).trim();
+  const safeHref = (href?: string) =>
+    href && (/^\/(?!\/)/.test(href) || /^https?:\/\//i.test(href))
+      ? href
+      : undefined;
+  const announcementHref = safeHref(announcement?.href);
+  const bannerHref = safeHref(banner?.href);
+  const announcementContent = (
+    <>
+      {text}
+      {announcementHref && (
+        <ArrowRight size={16} weight="bold" aria-hidden="true" />
+      )}
+    </>
+  );
+  const bannerContent = (
+    <>
+      {banner?.imageUrl && (
+        <img
+          src={banner.imageUrl}
+          alt={title ? "" : t.promoBanner}
+          loading="lazy"
+          decoding="async"
+        />
+      )}
+      {title && <span>{title}</span>}
+      {bannerHref && <ArrowRight size={22} weight="bold" aria-hidden="true" />}
+    </>
+  );
+  if (
+    !(announcement?.enabled && text) &&
+    !(banner?.enabled && (title || banner.imageUrl))
+  )
+    return null;
+  return (
+    <aside className={s.promotions} aria-label={t.storeAnnouncements}>
+      {announcement?.enabled &&
+        text &&
+        (announcementHref ? (
+          <a className={s.announcement} href={announcementHref}>
+            {announcementContent}
+          </a>
+        ) : (
+          <div className={s.announcement}>{announcementContent}</div>
+        ))}
+      {banner?.enabled &&
+        (title || banner.imageUrl) &&
+        (bannerHref ? (
+          <a className={s.promoBanner} href={bannerHref}>
+            {bannerContent}
+          </a>
+        ) : (
+          <div className={s.promoBanner}>{bannerContent}</div>
+        ))}
+    </aside>
+  );
+}
+
 export function ShopShell({
   children,
   locale,
@@ -465,66 +589,68 @@ export function ShopShell({
   );
 }
 
-/** Bold category icons remain useful when a product photo is unavailable. */
+// One observer serves every fallback icon; no animation work for hidden cards.
+let gleamObserver: IntersectionObserver | undefined;
+const observedGleams = new Set<HTMLDivElement>();
+function observeGleam(element: HTMLDivElement) {
+  if (typeof IntersectionObserver === "undefined") {
+    element.dataset.gleamVisible = "true";
+    return () => {};
+  }
+  gleamObserver ??= new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      const target = entry.target as HTMLDivElement;
+      if (observedGleams.has(target))
+        target.dataset.gleamVisible = String(entry.isIntersecting);
+    }
+  });
+  observedGleams.add(element);
+  gleamObserver.observe(element);
+  return () => {
+    gleamObserver?.unobserve(element);
+    observedGleams.delete(element);
+    if (observedGleams.size === 0) {
+      gleamObserver?.disconnect();
+      gleamObserver = undefined;
+    }
+  };
+}
+
+/** A static alpha mask clips a compositor transform, avoiding animated SVG paints. */
 export const ClothingArt = memo(function ClothingArt({
   product,
   className,
   locale = "ru",
+  hidden = false,
 }: {
   product: Product;
   className?: string;
   locale?: Locale;
-  loading?: boolean;
+  hidden?: boolean;
 }) {
-  const id = `category-${useId().replace(/:/g, "")}`;
-  const CategoryIcon = categoryIcons[product.category] ?? TShirt;
+  const icon = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!hidden && icon.current) return observeGleam(icon.current);
+    if (icon.current) icon.current.dataset.gleamVisible = "false";
+  }, [hidden]);
+  const mask = categoryMasks[product.category] ?? categoryMasks["t-shirts"];
   return (
-    <svg
-      viewBox="0 0 256 256"
+    <div
+      ref={icon}
       className={className}
+      data-gleam-visible="false"
+      data-photo-loaded={hidden}
       role="img"
+      aria-hidden={hidden || undefined}
       aria-label={
         categoryName(locale, product.category) || product.names[locale]
       }
+      style={{ "--category-mask": `url("${mask}")` } as CSSProperties}
     >
-      <defs>
-        <mask
-          id={id}
-          maskUnits="userSpaceOnUse"
-          x="0"
-          y="0"
-          width="256"
-          height="256"
-        >
-          <CategoryIcon
-            x="0"
-            y="0"
-            width="256"
-            height="256"
-            weight="bold"
-            color="white"
-          />
-        </mask>
-      </defs>
-      <CategoryIcon
-        x="0"
-        y="0"
-        width="256"
-        height="256"
-        weight="bold"
-        color="#111"
-      />
-      <g mask={`url(#${id})`}>
-        <rect
-          className={s.gleam}
-          x="-90"
-          y="0"
-          width="42"
-          height="256"
-          fill="white"
-        />
-      </g>
-    </svg>
+      <span className={s.categoryMask} aria-hidden="true">
+        <span className={s.gleam} />
+      </span>
+    </div>
   );
 });
 export function ProductMedia({
@@ -549,7 +675,7 @@ export function ProductMedia({
         product={product}
         locale={locale}
         className={s.garment}
-        loading={state === "loading"}
+        hidden={state === "loaded"}
       />
       {source && state !== "error" && (
         <img
@@ -601,14 +727,15 @@ const ProductCard = memo(function ProductCard({
         >
           <Heart size={22} weight={favorite ? "fill" : "bold"} />
         </button>
-        {product.isDemo && <span className={s.demoTag}>{t.demo}</span>}
         {!stock && !product.isDemo && (
           <span className={s.demoTag}>{t.soldOut}</span>
         )}
       </div>
       <div className={s.productMeta}>
         <div>
-          <p className={s.brand}>{product.brand}</p>
+          {!(product.isDemo && product.brand.toUpperCase() === "DEMO") && (
+            <p className={s.brand}>{product.brand}</p>
+          )}
           <Link
             prefetch={false}
             href={`/${locale}/p/${product.slug}`}
@@ -973,6 +1100,9 @@ export function Storefront({
       (gender === "men" ? t.men : gender === "women" ? t.women : t.new);
   return (
     <ShopShell locale={locale} settings={settings}>
+      {!favoritesOnly && (
+        <StorePromotions locale={locale} settings={settings} />
+      )}
       <section className={s.catalog}>
         <div className={s.catalogTop}>
           <div>
@@ -1318,7 +1448,9 @@ export function ProductDetail({
           {t.catalog}
         </Link>
         <span>
-          {product.brand} / {name}
+          {product.isDemo && product.brand.toUpperCase() === "DEMO"
+            ? name
+            : `${product.brand} / ${name}`}
         </span>
       </div>
       <article className={s.productDetail}>
@@ -1331,7 +1463,6 @@ export function ProductDetail({
               locale={locale}
               imageIndex={imageIndex}
             />
-            {product.isDemo && <span className={s.detailDemo}>{t.demo}</span>}
             <span className={s.visualIndex}>
               URBANMAG / {product.category.toUpperCase()}
             </span>
@@ -1388,7 +1519,8 @@ export function ProductDetail({
         </div>
         <div className={s.detailInfo}>
           <div className={s.detailBrand}>
-            {product.brand}
+            {!(product.isDemo && product.brand.toUpperCase() === "DEMO") &&
+              product.brand}
             <button
               className={`${s.iconButton} ${favorite ? s.isFavorite : ""}`}
               aria-label={favorite ? t.removeFavorite : t.addFavorite}
@@ -1406,7 +1538,6 @@ export function ProductDetail({
               <del>{money(product.oldPrice, locale)}</del>
             )}
           </p>
-          {product.isDemo && <p className={s.note}>{t.demoHint}</p>}
           <div className={s.sizeSection} ref={sizeGroup}>
             <div className={s.labelRow}>
               <h2>{t.size}</h2>
@@ -1646,7 +1777,10 @@ export function CartView({ locale, settings, initialCart }: Common) {
                     <ProductMedia product={item.product} locale={locale} />
                   </Link>
                   <div className={s.cartItemInfo}>
-                    <p className={s.brand}>{item.product.brand}</p>
+                    {!(
+                      item.product.isDemo &&
+                      item.product.brand.toUpperCase() === "DEMO"
+                    ) && <p className={s.brand}>{item.product.brand}</p>}
                     <Link
                       prefetch={false}
                       className={s.cartProductName}
@@ -1859,7 +1993,6 @@ export function CheckoutView({ locale, settings, initialCart }: Common) {
                 <strong>{pickupAddress(settings, locale)}</strong>
               </div>
             </div>
-            {order.isDemo && <p className={s.note}>{t.orderDemo}</p>}
             {(order.paymentUrl || order.invoiceUrl) &&
               order.paymentStatus !== "paid" && (
                 <a

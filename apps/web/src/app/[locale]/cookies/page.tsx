@@ -1,6 +1,10 @@
 import { notFound } from "next/navigation";
 import { isLocale } from "@/lib/config";
 import { ShopShell } from "@/components/shop";
+import { getSettings } from "@urbanmag/core";
+import s from "@/components/shop.module.css";
+export const dynamic = "force-dynamic";
+
 const content = {
   ru: {
     title: "О cookies",
@@ -47,27 +51,23 @@ export default async function Page({
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
   const t = content[locale];
+  const settings = await getSettings();
   return (
-    <ShopShell locale={locale}>
-      <article
-        style={{
-          maxWidth: 760,
-          margin: "80px auto",
-          padding: "0 24px",
-          lineHeight: 1.8,
-        }}
-      >
-        <h1 style={{ fontSize: 48, letterSpacing: "-2px", lineHeight: 1.1 }}>
+    <ShopShell locale={locale} settings={settings}>
+      <article className={s.informationPage}>
+        <h1>
           {t.title}
-          <span style={{ color: "#e60012" }}>.</span>
+          <span className={s.titleDot}>.</span>
         </h1>
-        <p>{t.intro}</p>
-        <ul>
-          {t.items.map((item) => (
-            <li key={item}>{item}</li>
-          ))}
-        </ul>
-        <p>{t.note}</p>
+        <div className={s.informationBody}>
+          <p>{t.intro}</p>
+          <ul>
+            {t.items.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+          <p>{t.note}</p>
+        </div>
       </article>
     </ShopShell>
   );

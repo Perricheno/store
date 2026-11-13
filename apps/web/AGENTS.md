@@ -7,3 +7,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## Иконки категорий
+
+`src/lib/category-icons.ts` задает единый набор иконок категорий. После изменения набора выполните `npx tsx scripts/generate-category-masks.ts` из корня репозитория: `src/lib/category-masks.ts` — генерируемые статичные SVG-маски. Не редактируйте их вручную. Блик анимируется HTML-transform внутри статичной CSS-маски; сохраняйте паузу вне экрана, после загрузки фотографии и при уменьшении движения.

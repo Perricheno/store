@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { headers } from "next/headers";
 import localFont from "next/font/local";
@@ -79,6 +79,12 @@ export const metadata: Metadata = {
   verification: { google: process.env.GOOGLE_SITE_VERIFICATION || undefined },
   appleWebApp: { capable: true, title: "Urbanmag", statusBarStyle: "default" },
   icons: { apple: "/icons/urbanmag-192.png" },
+};
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#ffffff",
 };
 export default async function RootLayout({
   children,

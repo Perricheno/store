@@ -9,6 +9,13 @@ for (const width of [360, 390, 768, 1440]) {
     if (width < 768) {
       await expect(nav).toBeVisible();
       await expect(nav.getByRole("link")).toHaveCount(4);
+      const navBox = await nav.boundingBox();
+      expect(navBox!.x).toBeGreaterThanOrEqual(12);
+      expect(width - navBox!.x - navBox!.width).toBeGreaterThanOrEqual(12);
+      expect(800 - navBox!.y - navBox!.height).toBeGreaterThanOrEqual(12);
+      await expect(
+        nav.getByRole("link", { name: "Личный кабинет", exact: true }),
+      ).toHaveText("Профиль");
       for (const [name, path] of [
         ["Избранное", "/ru/favorites"],
         ["Корзина", "/ru/cart"],
@@ -136,10 +143,30 @@ test("missing product photos use a large masked category icon", async ({
 }) => {
   await page.setViewportSize({ width: 390, height: 800 });
   await page.goto("/ru/p/city-tee");
-  const icon = page.locator('article svg[role="img"]').first();
+  const icon = page.locator('article div[role="img"]').first();
   await expect(icon).toBeVisible();
   const box = await icon.boundingBox();
   expect(box!.width).toBeGreaterThanOrEqual(80);
   expect(box!.height).toBeGreaterThanOrEqual(80);
-  await expect(icon.locator('g[mask] rect[class*="gleam"]')).toBeVisible();
+  await expect(
+    icon.locator('span[class*="categoryMask"] span[class*="gleam"]'),
+  ).toBeVisible();
+});
+
+test("floating mobile navigation leaves room for the product action", async ({
+  page,
+}) => {
+  for (const width of [360, 393]) {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto("/ru/p/city-tee");
+    const nav = page.locator('nav[class*="bottomNav"]');
+    const cta = page.locator('div[class*="mobileCta"]');
+    await expect(cta).toBeVisible();
+    const navBox = await nav.boundingBox();
+    const ctaBox = await cta.boundingBox();
+    expect(ctaBox!.y + ctaBox!.height).toBeLessThanOrEqual(navBox!.y - 8);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBe(width);
+  }
 });
