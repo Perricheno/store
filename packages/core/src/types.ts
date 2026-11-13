@@ -52,6 +52,8 @@ export interface Cart {
   count: number;
 }
 export interface OrderLine {
+  /** Historical category snapshot; absent on legacy orders. */
+  category?: string;
   productId: string;
   variantId: string;
   name: string;
@@ -133,4 +135,19 @@ export function publicProduct(product: Product): Product {
     details: product.details.filter((detail) => detail.enabled),
     ...(promotion?.enabled ? { promotion } : {}),
   };
+}
+
+export interface StaffInsights {
+  generatedAt: string;
+  period: { days: 7 | 30 | 90 | 365; from: string; to: string; timezone: "Asia/Almaty" };
+  revenue: { completedAmount: number; completedOrders: number; averageCompletedOrder: number | null };
+  pipeline: { paidAmount: number; paidOrders: number };
+  orders: { created: number; byStatus: Record<string, number> };
+  catalog: { realProducts: number; demoProducts: number; publishedRealProducts: number };
+  inventory: { availableUnits: number; reservedUnits: number; lowVariants: number; outVariants: number; alerts: Array<{ variantId: string; productId: string; names: Translations; size: string; color: string; available: number }> };
+  daily: Array<{ date: string; createdOrders: number; completedOrders: number; completedAmount: number }>;
+  topProducts: Array<{ productId: string; names: Translations; units: number; amount: number }>;
+  categorySales: Array<{ category: string | null; units: number; amount: number }>;
+  /** History counts are all-time; linesWithoutCategory covers sales in the selected period. */
+  quality: { allOrders: number; verifiedRealOrders: number; demoOrders: number; sandboxOrders: number; unverifiedOrders: number; completedWithoutTimestamp: number; linesWithoutCategory: number; partialRefundOrders: number };
 }

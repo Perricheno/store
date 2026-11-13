@@ -75,6 +75,7 @@ test("staff can open inventory dialog and attach a photo to a new product", asyn
     expect(loginResponse.ok()).toBeTruthy();
   }
   await expect(workspace).toBeVisible();
+  await page.getByRole("button", { name: "Товары", exact: true }).click();
   const stockButton = page
     .locator("tbody tr")
     .first()

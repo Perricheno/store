@@ -329,6 +329,11 @@ async function handler(
         );
         return json({ ok: true });
       }
+      if (path === "staff/insights" && method === "GET") {
+        await requireStaff();
+        const days = new URL(request.url).searchParams.get("days");
+        return json(await core.getStaffInsights(user.id, days === null ? {} : { days: Number(days) }));
+      }
       if (path === "staff/orders") return json(await core.listOrders(user.id));
       if (/^staff\/orders\/[^/]+$/.test(path) && method === "PATCH") {
         const input = await body(request);

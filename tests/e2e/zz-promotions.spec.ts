@@ -58,7 +58,7 @@ test("owner manages translated announcements and uploaded banners without a larg
     en: "New collection",
   };
   try {
-    await page.getByRole("button", { name: "Настройки", exact: true }).click();
+    await page.getByRole("button", { name: "Маркетинг", exact: true }).click();
     const announcement = page.getByRole("group", {
       name: "Объявление",
       exact: true,

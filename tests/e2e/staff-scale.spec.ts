@@ -36,6 +36,7 @@ test("staff product search and pagination limit rendered rows", async ({
   await expect(
     page.getByRole("heading", { name: "Рабочее пространство" }),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Товары", exact: true }).click();
   const rows = page.locator("tbody tr");
   await expect(rows).toHaveCount(24);
   await page.getByRole("button", { name: "Следующая", exact: true }).click();

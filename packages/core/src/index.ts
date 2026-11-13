@@ -1,3 +1,4 @@
+import { queryStaffInsights } from "./staff-insights";
 import {
   createHash,
   randomBytes,
@@ -834,6 +835,7 @@ export async function createCheckout(
     const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
     const lines: OrderLine[] = fresh.items.map((i) => ({
       productId: i.product.id,
+      category: i.product.category,
       variantId: i.variantId,
       name: i.product.names[data.locale],
       names: i.product.names,
@@ -1864,4 +1866,12 @@ export async function listJobs(actorId: string) {
     lockedAt: r.locked_at ? date(r.locked_at) : null,
     lastError: r.last_error,
   }));
+}
+
+export async function getStaffInsights(actorId: string, input: { days?: number } = {}): Promise<import("./types").StaffInsights> {
+  await initCore();
+  const db = await database();
+  await staff(db, actorId);
+  const { days } = parse(z.object({ days: z.union([z.literal(7), z.literal(30), z.literal(90), z.literal(365)]).default(30) }), input);
+  return queryStaffInsights(db, days);
 }

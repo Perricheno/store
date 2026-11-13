@@ -41,6 +41,7 @@ test("product editor persists hidden characteristics and translated promotion", 
   page,
 }) => {
   await loginOwner(page);
+  await page.getByRole("button", { name: "Товары", exact: true }).click();
   const response = await page.request.get("/api/staff/products");
   expect(response.ok()).toBeTruthy();
   const original = ((await response.json()) as Product[]).find(
